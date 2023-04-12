@@ -27,6 +27,9 @@ class SVCallPostprocessingInfo:
 
 @dataclass
 class SVCall:
+    """
+    用来表示每个SV。
+    """
     contig: str
     pos: int
     id: str

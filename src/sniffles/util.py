@@ -99,6 +99,9 @@ def fatal_error_main(msg):
     raise Sniffles2Exit
 
 def load_tandem_repeats(filename,padding):
+    """
+    读取tandem repeats bed文件，返回字典。
+    """
     contigs_tr={}
     unsorted=False
     with open(filename,"r") as handle:

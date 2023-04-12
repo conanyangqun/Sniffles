@@ -43,7 +43,13 @@ def format_genotype(gt):
         return f"{a}{gt_sep}{b}:{qual}:{dr}:{dv}:{id}"
 
 class VCF:
+    """
+    用来抽象为整个VCF。
+    """
     def __init__(self,config,handle):
+        """
+        以整个程序的配置信息和vcf文件句柄初始化
+        """
         self.config=config
         self.handle=handle
         self.call_count=0
@@ -54,9 +60,11 @@ class VCF:
         self.default_genotype=config.genotype_none
 
         if config.mode=="combine":
+            # GT:GQ:DR:DV:ID
             self.genotype_format=config.genotype_format+":ID"
             self.default_genotype+=tuple(["NULL"])
         else:
+            # GT:GQ:DR:DV
             self.genotype_format=config.genotype_format
 
         self.reference_handle=None
@@ -212,7 +220,7 @@ class VCF:
         self.call_count+=1
 
     def read_svs_iter(self):
-        self.header_str=""
+        self.header_str="" # 存储vcf的头信息
         line_index=0
         for line in self.handle:
             try:
@@ -224,7 +232,9 @@ class VCF:
                     if line_strip[0]=="#":
                         self.header_str+=line_strip+"\n"
                     continue
+
                 CHROM,POS,ID,REF,ALT,QUAL,FILTER,INFO=line.split("\t")[:8]
+
                 info_dict={}
                 for info_item in INFO.split(";"):
                     if "=" in info_item:
@@ -232,8 +242,9 @@ class VCF:
                     else:
                         key,value=info_item,True
                     info_dict[key]=value
+                
                 call=sv.SVCall(contig=CHROM,
-                               pos=int(POS)-1,
+                               pos=int(POS)-1, # 0-based？
                                id=line_index,
                                ref=REF,
                                alt=ALT,

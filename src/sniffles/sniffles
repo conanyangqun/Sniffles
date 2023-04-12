@@ -59,7 +59,9 @@ def Sniffles2_Main(config,processes):
     if len(set(input_ext)) > 1:
         util.fatal_error_main(f"Please specify either: A single .bam/.cram file - OR - one or more .snf files - OR - a single .tsv file containing a list of .snf files and optional sample ids as input. (supplied were: {list(set(input_ext))})")
 
+    # 根据输入文件扩展名和数目判断运行模式
     if "bam" in input_ext or "cram" in input_ext:
+        # 输入文件为bam或者cram
         if input_ext.count("bam")+input_ext.count("cram") > 1:
             util.fatal_error_main(f"Please specifify max 1 .bam//.cram file as input (got {input_ext.count('bam')})")
         config.input=config.input[0]
@@ -81,12 +83,14 @@ def Sniffles2_Main(config,processes):
     else:
         util.fatal_error_main(f"Failed to determine run mode from input. Please specify either: A single .bam file - OR - one or more .snf files - OR - a single .tsv file containing a list of .snf files and optional sample ids as input. (supplied were: {list(set(input_ext))})")
 
+    # 判断其他参数合理性
     if config.mode != "call_sample" and config.snf != None:
         util.fatal_error_main(f"--snf cannot be used with run mode {mode}")
 
     if config.vcf == None and config.snf == None:
         util.fatal_error_main("Please specify at least one of: --vcf or --snf for output (both may be used at the same time)")
 
+    # 设置VCF中样本的名称
     if config.mode=="call_sample":
         if config.sample_id==None:
             #config.sample_id,_=os.path.splitext(os.path.basename(config.input))
@@ -98,6 +102,7 @@ def Sniffles2_Main(config,processes):
         config.sample_id=None
 
         if config.combine_consensus:
+            # 所有样本的一致基因型？
             config.sample_ids_vcf=[(0,"CONSENSUS")]
         else:
             config.sample_ids_vcf=[] #Determined from .snf headers
@@ -112,6 +117,7 @@ def Sniffles2_Main(config,processes):
     #
     # call_sample/genotype_vcf: Open .bam file for single calling / .snf creation
     #
+    # call_sample, genotype_vcf模式，打开bam/cram文件，读取tr文件
     contig_tandem_repeats={}
     if config.mode=="call_sample" or config.mode=="genotype_vcf":
         print(f"Opening for reading: {config.input}")
@@ -133,6 +139,7 @@ def Sniffles2_Main(config,processes):
     #
     #genotype_vcf: Read SVs from VCF to be genotyped
     #
+    # 读取VCF中的SV，并以SVCall类表示
     if config.mode=="genotype_vcf":
         path,ext=os.path.splitext(config.genotype_vcf)
         ext=ext.lower()
@@ -142,12 +149,13 @@ def Sniffles2_Main(config,processes):
             vcf_in_handle=open(config.genotype_vcf,"r")
         else:
             util.fatal_error_main("Expected a .vcf or .vcf.gz file for genotyping using --genotype-vcf")
-        vcf_in=vcf.VCF(config,vcf_in_handle)
+        vcf_in=vcf.VCF(config,vcf_in_handle) # VCF类，表示VCF文件
 
-        genotype_lineindex_order=[]
-        genotype_lineindex_svs={}
-        genotype_contig_svs={}
+        genotype_lineindex_order=[] # sv的行索引
+        genotype_lineindex_svs={} # 以sv的行索引为key，存储sv
+        genotype_contig_svs={} # 以contig为单位存储svcall
         genotype_lineindex_svcalls_returned={}
+        # svcall为表示SV的类
         for svcall in vcf_in.read_svs_iter():
             if not svcall.contig in genotype_contig_svs:
                 genotype_contig_svs[svcall.contig]=[]
