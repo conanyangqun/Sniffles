@@ -70,6 +70,9 @@ class VCF:
         self.reference_handle=None
 
     def open_reference(self):
+        """
+        如果设置了参考基因组文件，打开参考基因组。
+        """
         if self.config.reference == None:
             return
         if not os.path.exists(self.config.reference+".fai") and not os.path.exists(self.config.reference+".gzi"):
@@ -220,6 +223,9 @@ class VCF:
         self.call_count+=1
 
     def read_svs_iter(self):
+        """
+        迭代读取每一行，返回sv.SVCall对象，表示每个SV。
+        """
         self.header_str="" # 存储vcf的头信息
         line_index=0
         for line in self.handle:

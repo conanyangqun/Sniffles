@@ -23,6 +23,9 @@ from sniffles import util
 
 @dataclass
 class Task:
+    """
+    表示一个单独的task
+    """
     id: int
     sv_id: int
     contig: str

@@ -168,6 +168,7 @@ def Sniffles2_Main(config,processes):
     #
     # Open output files
     #
+    # 准备输出的VCF文件
     config.vcf_output_bgz=False
     if config.vcf != None:
         path,ext=os.path.splitext(config.vcf)
@@ -211,6 +212,7 @@ def Sniffles2_Main(config,processes):
 
         print(f"Opening for writing: {config.vcf} {vcf_output_info_str}")
 
+    # 准备输出的SNF文件
     if config.snf != None:
         print(f"Opening for writing: {config.snf}")
 
@@ -223,20 +225,23 @@ def Sniffles2_Main(config,processes):
     #
     # Plan multiprocessing tasks
     #
+    # 创建并行任务
     task_id=0
     tasks_list=[]
-    contig_tasks_intervals={}
+    contig_tasks_intervals={} # 以contig为key，存储每个task区间和task
 
     if config.mode=="call_sample" or config.mode=="genotype_vcf":
         #
         # Process .bam header
         #
-        total_mapped=bam_in.mapped
+        total_mapped=bam_in.mapped # 比对的reads总数？
         if (config.threads==1 and not config.low_memory) or config.task_count_multiplier==0:
+            # config.py中设置了task_count_multiplier = 0，因此总是执行此条件
             task_max_reads=total_mapped
         else:
             task_max_reads=max(1,math.floor(total_mapped/(config.threads*config.task_count_multiplier)))
 
+        # 设置task_read_id最大值
         if total_mapped==0:
             #Total mapped returns 0 for CRAM files
             config.task_read_id_offset_mult=10**9
@@ -244,9 +249,10 @@ def Sniffles2_Main(config,processes):
             #BAM file
             config.task_read_id_offset_mult=10**math.ceil(math.log(total_mapped)+1)
 
-        contig_lengths=[]
-        contig_coverages={}
-        contigs_with_tr_annotations=0
+        contig_lengths=[] # 以(contig, length)形式存储contig长度
+        contig_coverages={} # 以contig -> []形式存储染色体覆盖度
+        contigs_with_tr_annotations=0 # 统计具有tr注释的contig数目
+        # 根据reads数目计算任务数目
         for contig in bam_in.get_index_statistics():
             if task_max_reads==0:
                 task_count=1
@@ -256,13 +262,15 @@ def Sniffles2_Main(config,processes):
             contig_length=bam_in.get_reference_length(contig_str)
             contig_lengths.append((contig_str, contig_length))
             contig_coverages[contig_str]=[]
-            task_length=math.floor(contig_length/float(task_count))
+            task_length=math.floor(contig_length/float(task_count)) # 根据task_count计算每个task的长度
             contigs_with_tr_annotations+=int(contig_str in contig_tandem_repeats)
             startpos=0
 
             while startpos < contig_length-1:
+                # 迭代每个task_length
                 endpos=min(contig_length-1,startpos+task_length)
                 if config.genotype_vcf!=None:
+                    # 如果设置了sv vcf，则获取该区域的sv
                     if contig_str in genotype_contig_svs:
                         genotype_svs=[target_sv for target_sv in genotype_contig_svs[contig_str] if target_sv.pos >= startpos and target_sv.pos < endpos]
                     else:
@@ -270,6 +278,7 @@ def Sniffles2_Main(config,processes):
                 else:
                     genotype_svs=None
 
+                # 创建task任务
                 task=parallel.Task(id=task_id,
                                    contig=contig_str,
                                    start=startpos,
@@ -290,6 +299,7 @@ def Sniffles2_Main(config,processes):
             print(f"Info: {contigs_with_tr_annotations} of {len(contig_lengths)} contigs in the input sample have associated tandem repeat annotations.")
 
             if contigs_with_tr_annotations==0:
+                # 未发现任何contig具有tr，则属于致命错误。
                 util.fatal_error_main("A tandem repeat annotations file was provided, but no matching annotations were found for any contig in the sample input file. Please check if the contig naming scheme in the tandem repeat annotations matches with the one in the input sample file.")
 
     elif config.mode=="combine":

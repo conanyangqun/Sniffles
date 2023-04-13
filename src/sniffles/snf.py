@@ -16,7 +16,13 @@ import math
 from sniffles import sv
 
 class SNFile:
+    """
+    表示SNF文件。
+    """
     def __init__(self,config,handle,filename=None):
+        """
+        初始化基本的变量，包括文件句柄等。
+        """
         self.config=config
         self.handle=handle
         self.filename=filename
