@@ -38,10 +38,13 @@ class Task:
     genotype_svs: list=None
 
     def build_leadtab(self,config):
+        """
+        从bam中获取线索。
+        """
         assert(self.lead_provider==None)
 
-        self.bam=pysam.AlignmentFile(config.input, config.input_mode, require_index=True)
-        self.lead_provider=leadprov.LeadProvider(config,self.id*config.task_read_id_offset_mult)
+        self.bam=pysam.AlignmentFile(config.input, config.input_mode, require_index=True) # 重新读取bam
+        self.lead_provider=leadprov.LeadProvider(config,self.id*config.task_read_id_offset_mult) # 根据task id创建read id起始值
         externals=self.lead_provider.build_leadtab(self.contig,self.start,self.end,self.bam)
         return externals,self.lead_provider.read_count
 
@@ -182,6 +185,9 @@ class Task:
 
 @dataclass
 class Process:
+    """
+    表示每个进程。
+    """
     id: int
     process: object=None
     pipe_main: object=None
@@ -199,9 +205,12 @@ def Main(proc_id,config,pipe):
         raise e
 
 def Main_Internal(proc_id,config,pipe):
+    """
+    每个进程调用的目标函数。
+    """
     tasks={}
     while True:
-        command,arg=pipe.recv()
+        command,arg=pipe.recv() # 从管道接收命令和task对象
 
         if command=="call_sample":
             task=arg
@@ -221,6 +230,7 @@ def Main_Internal(proc_id,config,pipe):
                 result["svcalls"]=[s for s in svcalls if s.qc]
 
             if config.snf != None: # and len(svcandidates):
+                # 每个task生成snf文件
                 snf_filename=f"{config.snf}.tmp_{task.id}.snf"
 
                 with open(snf_filename,"wb") as handle:
@@ -247,7 +257,7 @@ def Main_Internal(proc_id,config,pipe):
             result["coverage_average_total"]=task.coverage_average_total
             pipe.send(["return_call_sample",result])
             del task
-            gc.collect()
+            gc.collect() # ?
 
         elif command=="genotype_vcf":
             task=arg

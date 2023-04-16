@@ -236,7 +236,7 @@ def from_cmdline():
         util.fatal_error("Currently only --genotype-ploidy 2 is supported")
 
     #SNF
-    config.snf_block_size=10**5
+    config.snf_block_size=10**5 # 100000 = 100kb.
     config.snf_combine_keep_open=True #Keep file handles open during .snf combining (might be an issue if the number of .snf files to merge is very large)
 
     #Combine

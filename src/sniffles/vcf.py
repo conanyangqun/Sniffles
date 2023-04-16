@@ -81,6 +81,9 @@ class VCF:
         self.reference_handle=pysam.FastaFile(self.config.reference)
 
     def write_header(self,contigs_lengths):
+        """
+        输出头信息到VCF输出文件中。
+        """
         self.write_header_line("fileformat=VCFv4.2")
         self.write_header_line(f"source={self.config.version}_{self.config.build}")
         self.write_header_line('command="'+self.config.command+'"')
@@ -135,6 +138,9 @@ class VCF:
         self.write_raw(f"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t{samples_header}")
 
     def write_raw(self,text,endl="\n"):
+        """
+        根据VCF是否压缩，输出压缩数据或者普通数据
+        """
         if self.config.vcf_output_bgz:
             self.handle.write(text.encode())
             self.handle.write(endl.encode())
@@ -143,6 +149,9 @@ class VCF:
             self.handle.write(endl)
 
     def write_header_line(self,text):
+        """
+        在字符串前添加##，并调用write_raw方法。
+        """
         self.write_raw("##"+text)
 
     def write_call(self,call):

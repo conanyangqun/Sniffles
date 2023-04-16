@@ -150,6 +150,9 @@ for k,v in OPTAB.items():
     OPLIST[int(k)]=v
 
 def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
+    """
+    从read的cigar操作中提取ins，del，soft_clip，生成lead。
+    """
     minsvlen=config.minsvlen_screen
     longinslen=config.long_ins_length/2.0
     seq_cache_maxlen=config.dev_seq_cache_maxlen
@@ -162,9 +165,11 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
 
     pos_read=0
     pos_ref=read.reference_start
+    # 迭代每个cigar操作
     for op,oplength in read.cigartuples:
         add_read,add_ref,event=OPLIST[op]
         if event and oplength >= minsvlen:
+            # 应该记录的lead
             if op==CINS:
                 yield Lead(read_id,
                            qname,
@@ -195,6 +200,7 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
                            "DEL",
                            -oplength)
             elif use_clips and op==CSOFT_CLIP and oplength >= longinslen:
+                # long ins
                 yield Lead(read_id,
                            qname,
                            contig,
@@ -213,11 +219,15 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
         pos_ref+=add_ref*oplength
 
 def read_itersplits_bnd(read_id,read,contig,config,read_nm):
+    """
+    从sup比对提取lead。
+    """
     assert(read.is_supplementary)
     #SA:refname,pos,strand,CIGAR,MAPQ,NM
     all_leads=[]
     supps=[part.split(",") for part in read.get_tag("SA").split(";") if len(part)>0]
 
+    # splits数目超过阈值
     if len(supps) > config.max_splits_base + config.max_splits_kb*(read.query_length/1000.0):
         return
 
@@ -433,11 +443,14 @@ def read_itersplits(read_id,read,contig,config,read_nm):
                            seq=lead.seq if svtype=="INS" else None)
 
 class LeadProvider:
+    """
+    SV线索的生成器。
+    """
     def __init__(self,config,read_id_offset):
         self.config=config
 
-        self.leadtab={}
-        self.leadcounts={}
+        self.leadtab={} # 以sv类型为key，存储线索
+        self.leadcounts={} # 以sv类型为key
 
         for svtype in sv.TYPES:
             self.leadtab[svtype]={}
@@ -449,8 +462,8 @@ class LeadProvider:
         #self.covrtab_read_start={}
         #self.covrtab_read_end={}
 
-        self.read_id=read_id_offset
-        self.read_count=0
+        self.read_id=read_id_offset # read id的起始值
+        self.read_count=0 # read总数
 
         self.contig=None
         self.start=None
@@ -469,8 +482,12 @@ class LeadProvider:
         self.leadcounts[ld.svtype]+=1
 
     def build_leadtab(self,contig,start,end,bam):
+        """
+        根据contig:start-end获取leads。
+        """
         if self.config.dev_cache:
-            loaded_externals=self.dev_load_leadtab(contig,start,end)
+            # 存在缓存，则载入缓存中的leads
+            loaded_externals=self.dev_load_leadtab(contig,start,end) # 此方法似乎尚未实现？
             if loaded_externals!=False:
                 return loaded_externals
 
@@ -480,10 +497,10 @@ class LeadProvider:
         self.contig=contig
         self.start=start
         self.end=end
-        self.covrtab_min_bin=int(self.start/self.config.coverage_binsize)*self.config.coverage_binsize
+        self.covrtab_min_bin=int(self.start/self.config.coverage_binsize)*self.config.coverage_binsize # 覆盖度bin默认为cluster bin.此步骤根据start获取最近的bin
 
         externals=[]
-        ld_binsize=self.config.cluster_binsize
+        ld_binsize=self.config.cluster_binsize # 把基因组划分为窗口，例如100bp
 
         for ld in self.iter_region(bam,contig,start,end):
             ld_contig,ld_ref_start=ld.contig,ld.ref_start
@@ -501,18 +518,22 @@ class LeadProvider:
         return externals
 
     def iter_region(self,bam,contig,start=None,end=None):
+        """
+        迭代每个区域的reads，生成lead。
+        """
         leads_all=[]
         binsize=self.config.cluster_binsize
         coverage_binsize=self.config.coverage_binsize
         coverage_shift_bins=self.config.coverage_shift_bins
         coverage_shift_min_aln_len=self.config.coverage_shift_bins_min_aln_length
-        long_ins_threshold=self.config.long_ins_length*0.5
+        long_ins_threshold=self.config.long_ins_length*0.5 # 2500 * 0.5
         qc_nm=self.config.qc_nm
         phase=self.config.phase
         advanced_tags=qc_nm or phase
-        mapq_min=self.config.mapq
-        alen_min=self.config.min_alignment_length
+        mapq_min=self.config.mapq # 比对质量, 25
+        alen_min=self.config.min_alignment_length # 最短比对长度, 1kb
 
+        # 迭代contig:start-end区域的每条read
         for read in bam.fetch(contig,start,end,until_eof=False):
             #if self.read_count % 1000000 == 0:
             #    gc.collect()
@@ -523,20 +544,23 @@ class LeadProvider:
             self.read_count+=1
 
             alen=read.query_alignment_length
+
+            # 过滤reads
             if read.mapping_quality < mapq_min or read.is_secondary or alen < alen_min:
                 continue
 
-            has_sa=read.has_tag("SA")
-            use_clips=self.config.detect_large_ins and not read.is_supplementary and not has_sa
+            has_sa=read.has_tag("SA") # supplementary alignment？
+            use_clips=self.config.detect_large_ins and not read.is_supplementary and not has_sa # 检测大ins，非sup比对，没有SA标签的reads
 
             nm=-1
             curr_read_id=self.read_id
             if advanced_tags:
                 if qc_nm:
-                    if read.has_tag("NM"):
+                    if read.has_tag("NM"): # NM tag？
                         nm=read.get_tag("NM")/float(read.query_alignment_length+1)
 
                 if phase:
+                    # 获取（read_id, HP, PS)
                     curr_read_id=(self.read_id,str(read.get_tag("HP")) if read.has_tag("HP") else "NULL",str(read.get_tag("PS")) if read.has_tag("PS") else "NULL")
 
             #Extract small indels
@@ -546,9 +570,11 @@ class LeadProvider:
             #Extract read splits
             if has_sa:
                 if read.is_supplementary:
+                    # sup比对
                     for lead in read_itersplits_bnd(curr_read_id,read,contig,self.config,read_nm=nm):
                         yield lead
                 else:
+                    # primary比对
                     for lead in read_itersplits(curr_read_id,read,contig,self.config,read_nm=nm):
                         yield lead
 

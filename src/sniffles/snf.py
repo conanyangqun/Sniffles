@@ -93,6 +93,9 @@ class SNFile:
             self.total_length+=data_len
 
     def read_header(self):
+        """
+        读取SNF文件第一行，并解析为JSON格式，存储在header变量中。
+        """
         try:
             header_text=self.handle.readline()
             self.header_length=len(header_text)

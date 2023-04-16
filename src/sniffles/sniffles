@@ -306,18 +306,21 @@ def Sniffles2_Main(config,processes):
         #
         # Process .snf headers
         #
-        config.snf_input_info=[]
+        config.snf_input_info=[] # 以{internal_id, sample_id, filename}字典存储snf文件名和元信息
         total_mapped=0
-        snf_internal_id=0
+        snf_internal_id=0 # snf内部id编号
 
-        input_snfs_sample_ids=[]
+        input_snfs_sample_ids=[] # 存储snf文件和样本id
 
+        # 处理输入的SNF文件或者TSV文件
         if len(config.input)==1 and input_ext[0]=="tsv":
+            # 输入单个TSV文件，1列或者2列
             print(f"Opening for reading: {config.input[0]} (loading list of .snf files and associated sample ids)")
             with open(config.input[0],"r") as tsv_handle:
                 for line_index, line in enumerate(tsv_handle.readlines()):
                     line_strip=line.strip()
                     if len(line_strip)==0 or line_strip[0]=="#":
+                        # 跳过空行和#开头的行
                         continue
                     parts=line_strip.split("\t")
                     if len(parts)==1:
@@ -330,35 +333,44 @@ def Sniffles2_Main(config,processes):
                         util.fatal_error_main(f"Invalid sample list .tsv : {config.input[0]} : Line {line_index+1} - expected either one or two columns (first column: .snf filename, second column: optional sample id to overrule the one specified in the .snf file)")
                     input_snfs_sample_ids.append((snf_filename,sample_id))
         elif input_ext[0]=="snf":
+            # 输入的为SNF文件
             input_snfs_sample_ids=[(item,None) for item in config.input]
         else:
             util.fatal_error_main("Failed to determine .snf files to be combined. Please specify either one or more .snf files OR a single .tsv file as input for multi-calling.")
 
+        # 读取snf文件
         for input_filename, sample_id in input_snfs_sample_ids:
             snf_in=snf.SNFile(config,open(input_filename,"rb"),filename=input_filename)
             snf_in.read_header()
             total_mapped+=snf_in.header["snf_candidate_count"]
             contig_lengths=snf_in.header["config"]["contig_lengths"]
+
+            # 验证snf文件
             if not config.dev_skip_snf_validation:
                 if config.snf_block_size != snf_in.header["config"]["snf_block_size"]:
                     util.fatal_error_main(f"SNF block size differs for {input_filename}")
                 if config.snf_format_version != snf_in.header["config"]["snf_format_version"]:
                     util.fatal_error_main(f"SNF format version for {input_filename} is not supported")
+            
+            # 设置样本的id
             if sample_id==None:
                 if snf_in.header["config"]["sample_id"] != None:
                     sample_id=snf_in.header["config"]["sample_id"]
                 else:
                     sample_id,_=os.path.splitext(os.path.basename(input_filename))
+            
             config.snf_input_info.append({"internal_id":snf_internal_id, "sample_id": sample_id, "filename": input_filename})
             snf_internal_id+=1
             snf_in.handle.close()
 
+        # 设置vcf中的样本id
         if not config.combine_consensus:
             for info in config.snf_input_info:
                 config.sample_ids_vcf.append((info["internal_id"],info["sample_id"]))
 
         #TODO: Assure header consistency across multiple .snfs
 
+        # 迭代每个contig，设置Task。一个contig一个task。
         for contig_str,contig_length in contig_lengths:
             task=parallel.Task(id=task_id,contig=contig_str,start=0,end=contig_length-1,assigned_process_id=None,sv_id=0)
             tasks_list.append(task)
@@ -372,12 +384,14 @@ def Sniffles2_Main(config,processes):
         for info in config.snf_input_info:
             print(f"    {info['filename']} (sample ID in output VCF='{info['sample_id']}')")
 
+    # 非genotype_vcf模式，VCF输出文件需要输出头信息
     if config.mode!="genotype_vcf" and config.vcf != None:
         vcf_out.write_header(contig_lengths)
 
     #
     # Start workers
     #
+    # 创建分析进程
     for proc in range(config.threads):
         pipe_main,pipe_proc=multiprocessing.Pipe()
         proc=parallel.Process(id=proc,process=multiprocessing.Process(target=parallel.Main,args=(proc,config,pipe_proc)),pipe_main=pipe_main,externals=[])
@@ -388,11 +402,14 @@ def Sniffles2_Main(config,processes):
     tasks_todo=[t for t in tasks_list]
 
     if config.vcf != None and config.sort:
+        # 用于保存排序后的VCF？
         task_id_calls={}
 
+    # 启动分析进程
     for proc in processes:
         proc.process.start()
 
+    # 打印分析日志
     print("")
     if config.mode=="call_sample" or config.mode=="genotype_vcf":
         if config.input_is_cram:
@@ -407,8 +424,12 @@ def Sniffles2_Main(config,processes):
     #
     # Distribute analysis tasks to workers and collect results
     #
+    # 把分析任务分配到分析进程中。
     analysis_start_time=time.time()
     def show_progress():
+        """
+        设置进度提示信息。
+        """
         if config.no_progress:
             return
 
@@ -433,7 +454,7 @@ def Sniffles2_Main(config,processes):
             count_str+=f" {sv_count} SVs."
         print(f"{read_progress}{tasks_done_count}/{len(tasks_list)} tasks done; parallel {len(processes_busy)}/{len(processes)};{count_str} {mem_str}")
 
-    last_tasks_todo=len(tasks_todo)
+    last_tasks_todo=len(tasks_todo) # 剩余待分析任务数目
     externals_count=0
     tasks_done_count=0
     processed_read_count=0
@@ -443,17 +464,19 @@ def Sniffles2_Main(config,processes):
     time_build_start=time.time()
     seed=100
     while len(tasks_todo) > 0 or len(processes_busy) > 0:
+        # 存在待分析任务或处理中的任务
         while len(processes_free) > 0 and len(tasks_todo) > 0:
-            seed=(seed*1103515245+12345)%(2**31)
+            # 存在空闲进程，且存在待分析任务
+            seed=(seed*1103515245+12345)%(2**31) # 829870797?
             if config.low_memory:
-                task=tasks_todo.pop(seed%len(tasks_todo))
+                task=tasks_todo.pop(seed%len(tasks_todo)) # 随机选择一个task？
             else:
                 task=tasks_todo.pop()
             proc=processes_free.pop()
             processes_busy.append(proc)
-            assert(task.assigned_process_id==None)
+            assert(task.assigned_process_id==None) # 确保task没有被进程运行过
             task.assigned_process_id=proc.id
-            proc.pipe_main.send([config.mode,task])
+            proc.pipe_main.send([config.mode,task]) # 通过管道把运行模式、task传递给子进程
 
         if total_mapped > 0:
             #Progress disabled for CRAM files due to total read count not being stored in index
