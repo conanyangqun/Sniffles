@@ -353,16 +353,18 @@ def call_group(svgroup,config,task):
     return svcall
 
 def classify_splits(read,leads,config,main_contig):
-    minsvlen_screen=config.minsvlen_screen
+    minsvlen_screen=config.minsvlen_screen # 35bp * 0.9
     maxsvlen_other=minsvlen_screen*5
 
     leads.sort(key=lambda ld: ld.qry_start)
     last=leads[0]
     last.svtypes_starts_lens=[]
 
+    # read的主比对长度超过1/2 long ins，则看做INS sv。
     if last.qry_start >= config.long_ins_length*0.5:
         last.svtypes_starts_lens.append(("INS",last.ref_start,None))
 
+    # 迭代前n-1个lead
     for i in range(1,len(leads)):
         curr=leads[i]
         curr.svtypes_starts_lens=[]

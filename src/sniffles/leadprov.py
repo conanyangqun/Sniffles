@@ -41,6 +41,9 @@ class Lead:
     svtypes_starts_lens: list=None
 
 def CIGAR_analyze(cigar):
+    """
+    解析SA tag中的cigar字段，获取query_start, query_end, refspan, readspan等信息
+    """
     buf=""
     readspan=0
     refspan=0
@@ -253,11 +256,13 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
     prim_refname,prim_pos,prim_strand,prim_cigar,prim_mapq,prim_nm=supps[0]
     if prim_refname == contig:
         #Primary alignment is on this chromosome, no need to parse the supplementary
+        # primary比对和supplementary比对在同一条染色体上
         return
 
     minpos_curr_chr=min(itertools.chain([read.reference_start],(int(pos) for refname,pos,strand,cigar,mapq,nm in supps if refname==contig)))
     if minpos_curr_chr < read.reference_start:
         #Only process splits once per chr (there may be multiple supplementary alignments on the same chr)
+        # 在当前染色体上存在多个SA，则跳过分析
         return
 
     for refname,pos,strand,cigar,mapq,nm in supps:
@@ -483,7 +488,7 @@ class LeadProvider:
 
     def build_leadtab(self,contig,start,end,bam):
         """
-        根据contig:start-end获取leads。
+        根据contig:start-end获取leads，为生成器函数。
         """
         if self.config.dev_cache:
             # 存在缓存，则载入缓存中的leads
@@ -564,6 +569,7 @@ class LeadProvider:
                     curr_read_id=(self.read_id,str(read.get_tag("HP")) if read.has_tag("HP") else "NULL",str(read.get_tag("PS")) if read.has_tag("PS") else "NULL")
 
             #Extract small indels
+            # 从read的ins、del、soft_clip中提取lead
             for lead in read_iterindels(curr_read_id,read,contig,self.config,use_clips,read_nm=nm):
                 yield lead
 
