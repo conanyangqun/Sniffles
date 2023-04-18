@@ -353,6 +353,9 @@ def call_group(svgroup,config,task):
     return svcall
 
 def classify_splits(read,leads,config,main_contig):
+    """
+    对从SA中获取的各个leads，分析其SV类型。
+    """
     minsvlen_screen=config.minsvlen_screen # 35bp * 0.9
     maxsvlen_other=minsvlen_screen*5
 
@@ -364,16 +367,18 @@ def classify_splits(read,leads,config,main_contig):
     if last.qry_start >= config.long_ins_length*0.5:
         last.svtypes_starts_lens.append(("INS",last.ref_start,None))
 
-    # 迭代前n-1个lead
+    # 迭代2 - n 个leads，即split比对
     for i in range(1,len(leads)):
         curr=leads[i]
         curr.svtypes_starts_lens=[]
-        qry_dist_abs=abs(curr.qry_start - last.qry_end)
+        qry_dist_abs=abs(curr.qry_start - last.qry_end) # 与第一个lead的距离
 
         if curr.contig == last.contig:
+            # 两个lead位于同一条染色体上
             rev=(curr.strand == "-")
             fwd=not rev
             if curr.strand == last.strand:
+                # 两个lead的链方向相同
                 #
                 #INS, DEL, DUP
                 #

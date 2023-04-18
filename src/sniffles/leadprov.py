@@ -38,7 +38,7 @@ class Lead:
     svtype: str=None
     svlen: int=None
     seq: str=None
-    svtypes_starts_lens: list=None
+    svtypes_starts_lens: list=None # 存储sv的类型、起始位置、长度
 
 def CIGAR_analyze(cigar):
     """
@@ -262,9 +262,10 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
     minpos_curr_chr=min(itertools.chain([read.reference_start],(int(pos) for refname,pos,strand,cigar,mapq,nm in supps if refname==contig)))
     if minpos_curr_chr < read.reference_start:
         #Only process splits once per chr (there may be multiple supplementary alignments on the same chr)
-        # 在当前染色体上存在多个SA，则跳过分析
+        # 如果染色体上存在多个SA，则只处理比对位置最前的一个
         return
 
+    # 同一染色上的多个SA比对，或者不同染色体上的SA比对
     for refname,pos,strand,cigar,mapq,nm in supps:
         mapq=int(mapq)
         nm=int(nm)
@@ -295,8 +296,9 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
                               "SPLIT_SUP",
                               "?"))
 
-    sv.classify_splits(read,all_leads,config,contig)
+    sv.classify_splits(read,all_leads,config,contig) # 根据每个lead，判断SV的类型
 
+    # 从SA比对中只提取BND类型
     for lead in all_leads:
         for svtype, svstart, arg in lead.svtypes_starts_lens:
             if svtype=="BND":
@@ -319,6 +321,9 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
                 yield bnd
 
 def read_itersplits(read_id,read,contig,config,read_nm):
+    """
+    从primary比对中提取leads，判断sv的类型。生成BND、INS等不同类型的SV。
+    """
     #SA:refname,pos,strand,CIGAR,MAPQ,NM
     all_leads=[]
     supps=[part.split(",") for part in read.get_tag("SA").split(";") if len(part)>0]
@@ -461,7 +466,7 @@ class LeadProvider:
             self.leadtab[svtype]={}
             self.leadcounts[svtype]=0
 
-        self.covrtab_fwd={}
+        self.covrtab_fwd={} # 以bin的坐标为key，记录read在bin中的数目。start位置为1，end位置为-1
         self.covrtab_rev={}
         self.covrtab_min_bin=None
         #self.covrtab_read_start={}
@@ -507,6 +512,7 @@ class LeadProvider:
         externals=[]
         ld_binsize=self.config.cluster_binsize # 把基因组划分为窗口，例如100bp
 
+        # 迭代每个lead
         for ld in self.iter_region(bam,contig,start,end):
             ld_contig,ld_ref_start=ld.contig,ld.ref_start
 
@@ -525,6 +531,7 @@ class LeadProvider:
     def iter_region(self,bam,contig,start=None,end=None):
         """
         迭代每个区域的reads，生成lead。
+        生成器函数。
         """
         leads_all=[]
         binsize=self.config.cluster_binsize
@@ -578,7 +585,7 @@ class LeadProvider:
                 if read.is_supplementary:
                     # sup比对
                     for lead in read_itersplits_bnd(curr_read_id,read,contig,self.config,read_nm=nm):
-                        yield lead
+                        yield lead # 只含BND类型的lead
                 else:
                     # primary比对
                     for lead in read_itersplits(curr_read_id,read,contig,self.config,read_nm=nm):
