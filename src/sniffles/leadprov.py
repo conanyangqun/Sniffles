@@ -463,8 +463,8 @@ class LeadProvider:
         self.leadcounts={} # 以sv类型为key
 
         for svtype in sv.TYPES:
-            self.leadtab[svtype]={}
-            self.leadcounts[svtype]=0
+            self.leadtab[svtype]={} # 以pos为key -> 存储lead列表
+            self.leadcounts[svtype]=0 # 存储每种sv的lead数目。
 
         self.covrtab_fwd={} # 以bin的坐标为key，记录read在bin中的数目。start位置为1，end位置为-1
         self.covrtab_rev={}
@@ -480,11 +480,15 @@ class LeadProvider:
         self.end=None
 
     def record_lead(self,ld,pos_leadtab):
+        """
+        根据lead的bin坐标，把lead存储到leadtab中，并更新leadcounts。
+        """
         leadtab_svtype=self.leadtab[ld.svtype]
         if pos_leadtab in leadtab_svtype:
             leadtab_svtype[pos_leadtab].append(ld)
             lead_count=len(leadtab_svtype[pos_leadtab])
             if lead_count > self.config.consensus_max_reads_bin:
+                # 默认10条reads
                 ld.seq=None
         else:
             leadtab_svtype[pos_leadtab]=[ld]
@@ -493,7 +497,7 @@ class LeadProvider:
 
     def build_leadtab(self,contig,start,end,bam):
         """
-        根据contig:start-end获取leads，为生成器函数。
+        根据contig:start-end获取leads。如果lead位于当前区域，保存到相应的leadtab中。否则，存储到external中返回。
         """
         if self.config.dev_cache:
             # 存在缓存，则载入缓存中的leads
@@ -518,13 +522,14 @@ class LeadProvider:
 
             #TODO: Handle leads overlapping region ends (start/end)
             if contig==ld_contig and ld_ref_start >= start and ld_ref_start < end:
+                # 如果lead位于当前区域，则保存
                 pos_leadtab=int(ld_ref_start/ld_binsize)*ld_binsize
                 self.record_lead(ld,pos_leadtab)
             else:
                 externals.append(ld)
 
         if self.config.dev_cache:
-            self.dev_store_leadtab(contig,start,end,externals)
+            self.dev_store_leadtab(contig,start,end,externals) # 此方法未实现
 
         return externals
 
@@ -592,6 +597,7 @@ class LeadProvider:
                         yield lead
 
             #Record in coverage table
+            # 记录覆盖度信息
             read_end=read.reference_start+read.reference_length
             assert(read_end==read.reference_end)
             #assert(read_end>=read.reference_start)

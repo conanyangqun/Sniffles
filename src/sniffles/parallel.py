@@ -39,7 +39,7 @@ class Task:
 
     def build_leadtab(self,config):
         """
-        从bam中获取线索。
+        从bam中获取线索，构建leadtab。
         """
         assert(self.lead_provider==None)
 
