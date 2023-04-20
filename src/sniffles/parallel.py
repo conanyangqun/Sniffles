@@ -50,6 +50,7 @@ class Task:
 
     def call_candidates(self,keep_qc_fails,config):
         candidates=[]
+        # 迭代每种类型的sv
         for svtype in sv.TYPES:
             for svcluster in cluster.resolve(svtype,self.lead_provider,config,self.tandem_repeats):
                 for svcall in sv.call_from(svcluster,config,keep_qc_fails,self):

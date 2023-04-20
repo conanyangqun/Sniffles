@@ -28,19 +28,25 @@ class Cluster:
     leads_long: list
 
     def compute_metrics(self,max_n=100):
+        """
+        根据lead计算sv的长度均值、起始位置标准差。
+        """
         self.span=self.end-self.start
 
-        n=min(len(self.leads),max_n)
+        n=min(len(self.leads),max_n) # lead数目100以内为x，否则为100。
         if n==0:
+            # 0个lead
             self.mean_svlen=0
             self.stdev_start=0
             return
 
-        step=int(len(self.leads)/n)
+        step=int(len(self.leads)/n) # 100以内为1，100以上为100的倍数
         if n>1:
-            self.mean_svlen=sum(self.leads[i].svlen for i in range(0,len(self.leads),step))/float(n)
+            # 2个及以上lead
+            self.mean_svlen=sum(self.leads[i].svlen for i in range(0,len(self.leads),step))/float(n) # 抽取一部分数据
             self.stdev_start=statistics.stdev(self.leads[i].ref_start for i in range(0,len(self.leads),step))
         else:
+            # 1个lead
             self.mean_svlen=self.leads[0].svlen
             self.stdev_start=0
 
@@ -170,22 +176,27 @@ def resolve(svtype,leadtab_provider,config,tr):
     seeds=sorted(leadtab_provider.leadtab[svtype])
 
     if len(seeds)==0:
+        # 此区域没有lead
         return []
 
     #Initialize tandem repeat region handling
     if tr != None:
         tr_index=0
         if len(tr)==0:
+            # tr为空[]?
             tr=None
         else:
             tr_start,tr_end=tr[tr_index]
 
+    # 迭代每个cluster bin的位置，获取bin中所有的leads，创建cluster。一个bin对应一个cluster。
     clusters=[]
     for seed_index,seed in enumerate(seeds):
         if config.dev_call_region != None:
             if seed<config.dev_call_region["start"] or seed>config.dev_call_region["end"]:
                 continue
-
+        
+        # 判断seed（lead所在的起始位置）是否位于tr中
+        # 此处的代码似乎存在问题。就是只有第一个seed的tr判断有效。之后的seed，不再进习惯tr的判断？
         within_tr=False
         if tr!=None and tr_index < len(tr):
             while tr_end < seed and tr_index+1 < len(tr):
@@ -195,12 +206,13 @@ def resolve(svtype,leadtab_provider,config,tr):
                 within_tr=True
 
         if svtype=="INS":
-            leads=[lead for lead in leadtab[seed] if lead.svlen!=None]
-            leads_long=[lead for lead in leadtab[seed] if lead.svlen==None]
+            leads=[lead for lead in leadtab[seed] if lead.svlen!=None] # 小的ins
+            leads_long=[lead for lead in leadtab[seed] if lead.svlen==None] # long ins
         else:
             leads=leadtab[seed]
             leads_long=None
 
+        # 某个窗口内的所有leads属于1个cluster
         cluster=Cluster(id=f"CL.{svtype}.{leadtab_provider.contig}.{leadtab_provider.start}.{seed_index}",
                         svtype=svtype,
                         contig=leadtab_provider.contig,
