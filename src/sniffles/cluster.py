@@ -124,27 +124,35 @@ def resplit(cluster,prop,binsize,merge_threshold_min,merge_threshold_frac):
         yield new_cluster
 
 def resplit_bnd(cluster,merge_threshold):
-    contigs_leads={}
+    """
+    对于BND类型，迭代当前cluster的所有leads，按照mate信息创建新的cluster。
+    """
+    contigs_leads={} # 以contig -> {bin -> [lead]}形式存储
 
     #Split by mate contig and mate ref start
+    # 对于BND类型，获取每个lead的mate信息，根据mate信息分组lead。
     for lead in cluster.leads:
         if not lead.bnd_info.mate_contig in contigs_leads:
             contigs_leads[lead.bnd_info.mate_contig]={}
 
-        bin=int(lead.bnd_info.mate_ref_start/merge_threshold)*merge_threshold if merge_threshold>0 else 0
+        bin=int(lead.bnd_info.mate_ref_start/merge_threshold)*merge_threshold if merge_threshold>0 else 0 # 可以理解为bin
         if not bin in contigs_leads[lead.bnd_info.mate_contig]:
             contigs_leads[lead.bnd_info.mate_contig][bin]=[lead]
         else:
             contigs_leads[lead.bnd_info.mate_contig][bin].append(lead)
 
+    # 迭代每条染色体
     for contig in contigs_leads:
         bins=sorted(contigs_leads[contig])
         curr_leads=[]+contigs_leads[contig][bins[0]]
         last_bin=bins[0]
+        # 迭代每个窗口
         for bin in bins[1:]:
             if bin - last_bin <= merge_threshold:
+                # 小于阈值，合并两个相邻的bin
                 curr_leads.extend(contigs_leads[contig][bin])
             else:
+                # 大于阈值，创建新的cluster
                 if len(curr_leads):
                     new_cluster=Cluster(id=cluster.id+f".CHR2.{contig}.POS2.{bin}",
                                         svtype=cluster.svtype,
@@ -158,6 +166,8 @@ def resplit_bnd(cluster,merge_threshold):
                     yield new_cluster
                 curr_leads=[]+contigs_leads[contig][bin]
             last_bin=bin
+        
+        # 处理最后残留的leads
         if len(curr_leads):
             new_cluster=Cluster(id=cluster.id+f".CHR2.{contig}.POS2.{bin}",
                                 svtype=cluster.svtype,
@@ -172,11 +182,15 @@ def resplit_bnd(cluster,merge_threshold):
             yield new_cluster
 
 def resolve(svtype,leadtab_provider,config,tr):
+    """
+    根据每种sv的leadtab，迭代每个bin，构建cluster。
+    根据一系列条件，合并cluster。
+    """
     leadtab=leadtab_provider.leadtab[svtype]
     seeds=sorted(leadtab_provider.leadtab[svtype])
 
     if len(seeds)==0:
-        # 此区域没有lead
+        # 此区域没有lead，空{}
         return []
 
     #Initialize tandem repeat region handling
@@ -228,6 +242,7 @@ def resolve(svtype,leadtab_provider,config,tr):
 
 
     #Merge clusters
+    # 根据一系列条件合并clusters
     cluster_count_initial=len(clusters)
     i=0
     while i < len(clusters) - 1:
@@ -241,13 +256,14 @@ def resolve(svtype,leadtab_provider,config,tr):
         #  Inter-Cluster distance < (StdDev-Start-Within-A + StdDev-Stat-Within-B) * r   (r=1.0 default)
         #  Merged size (OR: Inter-cluster distance) < (MeanSVlen between both clusters) * h (h=0.5 default)
         #  Max. overall cluster size criterion?
-
+        # 根据一系列条件，判断是否合并clusters
         inner_dist=(next_cluster.start - curr_cluster.end)
         outer_dist=(next_cluster.end - curr_cluster.start)
         merge = inner_dist <= min(curr_cluster.stdev_start, next_cluster.stdev_start) * config.cluster_r
         merge = merge or ( (config.repeat or curr_cluster.repeat or next_cluster.repeat) and outer_dist <= min(config.cluster_repeat_h_max, (abs(curr_cluster.mean_svlen)+abs(next_cluster.mean_svlen)) * config.cluster_repeat_h) )
         merge = merge or (svtype=="BND" and inner_dist <= config.cluster_merge_bnd)
 
+        # 合并sv的具体代码
         if merge:
             clusters.pop(i+1)
             curr_cluster.leads+=next_cluster.leads
@@ -260,6 +276,7 @@ def resolve(svtype,leadtab_provider,config,tr):
         i+=1
 
     if config.dev_dump_clusters:
+        # 把clusters存储到文件中
         filename=f"{config.input}.clusters.{svtype}.{leadtab_provider.contig}.{leadtab_provider.start}.{leadtab_provider.end}.bed"
         print(f"Dumping clusters to {filename}")
         with open(filename,"w") as h:
@@ -269,12 +286,14 @@ def resolve(svtype,leadtab_provider,config,tr):
                     info+=f"(ref_start={ld.ref_start},svlen={ld.svlen},source={ld.source}); "
                 h.write(f"{c.contig}\t{c.start}\t{c.end}\t\"{info}\"\n")
 
+    # 迭代每个cluster，按照不同的sv类型进行拆分
     for cluster in clusters:
         if len(cluster.leads)==0:
             continue
 
         if svtype == "BND":
             if config.dev_no_resplit:
+                # 不再拆分cluster
                 yield cluster
             else:
                 for new_cluster in resplit_bnd(cluster,merge_threshold=config.bnd_cluster_resplit):
