@@ -51,13 +51,18 @@ class Cluster:
             self.stdev_start=0
 
 def merge_inner(cluster,threshold):
-    read_seq={}
+    """
+    对来自于同一条read的lead进行合并。
+    根据read来源对cluster的所有leads进行分组，迭代每条read上的每个lead，判断是否合并lead。返回合并了同一个read上lead的cluster
+    """
+    read_seq={} # 以read_qname为key，存储所有lead.
     for ld in cluster.leads:
         if not ld.read_qname in read_seq:
             read_seq[ld.read_qname]=[]
         read_seq[ld.read_qname].append(ld)
 
     cluster.leads=[]
+    # 迭代每一条read
     for qname in read_seq:
         read_seq[qname].sort(key=lambda k: k.ref_start)
         to_merge=read_seq[qname][0]
@@ -69,6 +74,7 @@ def merge_inner(cluster,threshold):
         last_ref_start=to_merge.ref_start
         last_qry_start=to_merge.qry_start
 
+        # 迭代每条read上的每个lead，判断是否合并
         for to_merge in read_seq[qname][1:]:
             merge=(threshold==-1) or ((abs(to_merge.ref_start-last_ref_end) < threshold or abs(to_merge.ref_start-last_ref_start) < threshold) and (abs(to_merge.qry_start-last_qry_end) < threshold or abs(to_merge.qry_start-last_qry_start) < threshold))
             if merge:
@@ -89,9 +95,13 @@ def merge_inner(cluster,threshold):
     return cluster
 
 def resplit(cluster,prop,binsize,merge_threshold_min,merge_threshold_frac):
-    bins_leads={}
+    """
+    根据cluster中lead的sv长度，拆分sv长度之差超过阈值的cluster为新的cluster。
+    """
+    # 根据sv的长度把lead分到不同的bin中
+    bins_leads={} # bin -> [lead]
     for lead in cluster.leads:
-        bin=int(abs(prop(lead))/binsize)*binsize
+        bin=int(abs(prop(lead))/binsize)*binsize # svlen / (binsize = 20), 根据sv的长度划分bin
         if not bin in bins_leads:
             bins_leads[bin]=[lead]
         else:
@@ -102,8 +112,8 @@ def resplit(cluster,prop,binsize,merge_threshold_min,merge_threshold_frac):
     while len(new_clusters) > 1 and i < len(new_clusters):
         last_cluster=new_clusters[i-1]
         curr_cluster=new_clusters[i]
-        merge_threshold=max(merge_threshold_min,min(curr_cluster,last_cluster)*merge_threshold_frac)
-        merge=abs(curr_cluster - last_cluster) <= merge_threshold
+        merge_threshold=max(merge_threshold_min,min(curr_cluster,last_cluster)*merge_threshold_frac) # 相邻两个lead的sv长度 * 0.33作为阈值
+        merge=abs(curr_cluster - last_cluster) <= merge_threshold # 两个lead的sv长度在阈值范围内
         if merge:
             bins_leads[new_clusters[i]].extend(bins_leads[new_clusters[i-1]])
             new_clusters.pop(i-1)
@@ -136,6 +146,7 @@ def resplit_bnd(cluster,merge_threshold):
             contigs_leads[lead.bnd_info.mate_contig]={}
 
         bin=int(lead.bnd_info.mate_ref_start/merge_threshold)*merge_threshold if merge_threshold>0 else 0 # 可以理解为bin
+        # 注意，所有的leads位于相同的bin中
         if not bin in contigs_leads[lead.bnd_info.mate_contig]:
             contigs_leads[lead.bnd_info.mate_contig][bin]=[lead]
         else:
@@ -183,8 +194,10 @@ def resplit_bnd(cluster,merge_threshold):
 
 def resolve(svtype,leadtab_provider,config,tr):
     """
+    根据leadtab_provider对象，创建cluster。
     根据每种sv的leadtab，迭代每个bin，构建cluster。
     根据一系列条件，合并cluster。
+    根据一系列条件，拆分cluster。
     """
     leadtab=leadtab_provider.leadtab[svtype]
     seeds=sorted(leadtab_provider.leadtab[svtype])
@@ -286,12 +299,13 @@ def resolve(svtype,leadtab_provider,config,tr):
                     info+=f"(ref_start={ld.ref_start},svlen={ld.svlen},source={ld.source}); "
                 h.write(f"{c.contig}\t{c.start}\t{c.end}\t\"{info}\"\n")
 
-    # 迭代每个cluster，按照不同的sv类型进行拆分
+    # 迭代每个cluster，对于不同的sv类型，根据不同的条件进行拆分。
     for cluster in clusters:
         if len(cluster.leads)==0:
             continue
 
         if svtype == "BND":
+            # BND类型拆分规则
             if config.dev_no_resplit:
                 # 不再拆分cluster
                 yield cluster
@@ -299,15 +313,17 @@ def resolve(svtype,leadtab_provider,config,tr):
                 for new_cluster in resplit_bnd(cluster,merge_threshold=config.bnd_cluster_resplit):
                     yield new_cluster
         else:
+            # 其他类型拆分规则
             if svtype=="INS" or svtype=="DEL":
                 if cluster.repeat:
                     merge_inner_threshold=-1
                 else:
-                    merge_inner_threshold=config.cluster_merge_pos
+                    merge_inner_threshold=config.cluster_merge_pos # 非重复区域同一个read或cluster上的indels合并的距离, 150 bp.
 
                 merge_inner(cluster,merge_inner_threshold)
 
             if not config.dev_no_resplit_repeat and not config.dev_no_resplit:
+                # 除非设置了不拆分、不拆分重复区域
                 for new_cluster in resplit(cluster,
                                            prop=lambda lead: lead.svlen,
                                            binsize=config.cluster_resplit_binsize,
