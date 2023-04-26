@@ -17,6 +17,9 @@ class Sniffles2Exit(Exception):
     pass
 
 def stdev(nums):
+    """
+    计算一组数字的标准差
+    """
     nums=list(nums)
     return statistics.stdev(nums) if len(nums) > 1 else 0
 
@@ -32,22 +35,32 @@ def median_or_mode(nums):
         return median_modes(nums)
 
 def median_noavg(nums):
+    """
+    计算nums中的中值
+    """
     nums=sorted(list(nums))
     mid=int(len(nums)/2)
     return nums[mid]
 
 def median_modes(nums):
-    max_count=0
-    counts={}
+    """
+    对于一系列数字nums，计算每个数字出现的次数。选择出现次数前2的数字，求中值
+    """
+    max_count=0 # nums中出现次数最多的数字的次数
+    counts={} # 以n为key -> 次数
     for n in nums:
         if not n in counts:
             counts[n]=1
         else:
             counts[n]+=1
         max_count=max(max_count,counts[n])
+    # 选择出现次数最多的前3个svlen，计算中值
     return median_noavg(k for k,n in counts.items() if max_count-n<3 )
 
 def mean(nums):
+    """
+    计算一组数字的平均值
+    """
     nums=list(nums)
     return sum(nums)/len(nums)
 
@@ -66,6 +79,9 @@ def mean_or_none_round(nums):
         return round(r)
 
 def trim(nums,pct=25):
+    """
+    获取pct中间的数字
+    """
     nums=sorted(list(nums))
     trim_n=int(len(nums)/float(100.0)*pct)
     if trim_n > 0:
@@ -74,6 +90,9 @@ def trim(nums,pct=25):
         return nums
 
 def most_common(nums):
+    """
+    计算一组数字/字符出现的次数并返回
+    """
     counts={}
     for n in nums:
         if not n in counts:
@@ -83,6 +102,9 @@ def most_common(nums):
     return sorted(((counts[n],n) for n in counts), reverse=True)
 
 def most_common_top(nums):
+    """
+    获取出现次数最多的数字/字符。如果有多个，返回最小的
+    """
     result=most_common(nums)
     return sorted(item for count,item in result if count==result[0][0])[0]
 

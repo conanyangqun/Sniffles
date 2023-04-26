@@ -62,16 +62,25 @@ def annotate_sv(svcall,config):
                 svcall.alt=best_lead.seq
 
 def add_request(svcall,field,pos,requests_for_coverage,config):
+    """
+    记录需要计算coverage的bin位置及元信息。
+    """
     bin=int(pos/config.coverage_binsize)*config.coverage_binsize
     if not bin in requests_for_coverage:
         requests_for_coverage[bin]=[]
     requests_for_coverage[bin].append((svcall,field))
 
 def coverage(calls,lead_provider,config):
+    '''
+    对于每个svcall，计算5个区域的coverage，并计算整个task区域的平均覆盖度。
+    '''
     requests_for_coverage=coverage_build_requests(calls,lead_provider,config)
     return coverage_fulfill(requests_for_coverage,calls,lead_provider,config)
 
 def coverage_build_requests(calls,lead_provider,config):
+    """
+    迭代每个sv，获取需要计算coverage的区域，创建计算请求。
+    """
     requests_for_coverage={}
     for svcall in calls:
         start=svcall.pos
@@ -87,17 +96,21 @@ def coverage_build_requests(calls,lead_provider,config):
     return requests_for_coverage
 
 def coverage_fulfill(requests_for_coverage,calls,lead_provider,config):
+    """
+    计算每个sv的5个区域的coverage，并计算某个task区域的平均覆盖度
+    """
     if len(requests_for_coverage)==0:
         return -1,-1
 
-    start_bin=lead_provider.covrtab_min_bin
-    end_bin=int(lead_provider.end/config.coverage_binsize)*config.coverage_binsize
+    start_bin=lead_provider.covrtab_min_bin # 有覆盖度最小的bin
+    end_bin=int(lead_provider.end/config.coverage_binsize)*config.coverage_binsize # 有覆盖度的最大的bin
     coverage_fwd=0
     coverage_rev=0
     coverage_fwd_total=0
     coverage_rev_total=0
     n=0
 
+    # 迭代每个bin，计算coverage。
     for bin in range(start_bin, end_bin+config.coverage_binsize,config.coverage_binsize):
         n+=1
 
@@ -112,7 +125,7 @@ def coverage_fulfill(requests_for_coverage,calls,lead_provider,config):
             for svcall, field in requests_for_coverage[bin]:
                 setattr(svcall,field,coverage_total_curr)
 
-        coverage_fwd_total+=coverage_fwd
+        coverage_fwd_total+=coverage_fwd # 需要结合leadprovider部分再研究
         coverage_rev_total+=coverage_rev
 
     average_coverage_fwd=coverage_fwd_total/float(n) if n>0 else 0

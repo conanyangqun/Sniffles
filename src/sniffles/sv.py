@@ -82,6 +82,9 @@ class SVGroup:
     coverages_nonincluded: dict
 
 def calculate_bounds(svtype,ref_start_mode,svlen_mode):
+    """
+    根据sv的类型计算sv的起止坐标。
+    """
     if svtype=="INS":
         svstart=ref_start_mode
         svend=ref_start_mode
@@ -94,40 +97,51 @@ def calculate_bounds(svtype,ref_start_mode,svlen_mode):
     return svstart,svend
 
 def call_from(cluster,config,keep_qc_fails,task):
+    """
+    从cluster中检出sv，得到svcall对象
+    """
     leads=cluster.leads
 
     svtype=cluster.svtype
     stdev_pos,stdev_len=None,None
     qc=True
 
-    svlen=util.center(v.svlen for v in leads)
+    svlen=util.center(v.svlen for v in leads) # 获取svlen出现次数前2的svlen中值
 
     if abs(svlen) < config.minsvlen_screen:
+        # svlen未通过阈值
         return
 
     #Count inline events only once per read, but split events as individual alignments, as in coverage calculation
     #inline_qnames=set(k.read_qname for k in leads if k.source=="INLINE")
     #support=len(inline_qnames)+sum(1 for k in leads if k.source!="INLINE")
     if svtype=="INS" and svlen>=config.long_ins_length:
+        # 对于long INS
         support_long_set=set(lead.read_qname for lead in cluster.leads_long)
-        support=len(set(k.read_qname for k in leads) | support_long_set)
+        support=len(set(k.read_qname for k in leads) | support_long_set) # 并集
         support_long=len(support_long_set)
     else:
         support=len(set(k.read_qname for k in leads))
         support_long=0
+    
     ref_start=util.center(v.ref_start for v in leads)
-    stdev_pos=util.stdev(util.trim((v.ref_start for v in leads)))
+    stdev_pos=util.stdev(util.trim((v.ref_start for v in leads))) # 获取1/4-3/4之间的位置，计算位置的std
+
+    # 根据sv长度、pos的sd，判断是否精确
     if svtype!="BND":
-        stdev_len=util.stdev(util.trim((v.svlen for v in leads)))
-        precise=(stdev_pos+stdev_len < config.precise)
+        stdev_len=util.stdev(util.trim((v.svlen for v in leads))) # 计算sv长度的stdev
+        precise=(stdev_pos+stdev_len < config.precise) # 如果sv长度、pos的sd小于25，则precise = True
     else:
+        # BND类型
         precise=(stdev_pos < config.precise)
-    svstart,svend=calculate_bounds(svtype,ref_start,svlen)
+    
+    svstart,svend=calculate_bounds(svtype,ref_start,svlen) # 计算sv的起止坐标
     qual=int(util.mean(v.mapq for v in leads))
 
     support_fwd=sum(lead.strand == "+" for lead in leads)
     support_rev=len(leads) - support_fwd
 
+    # 对sv执行过滤
     filter="PASS"
     if config.qc_strand and (support_fwd==0 or support_rev==0):
         filter="STRAND"
@@ -144,13 +158,14 @@ def call_from(cluster,config,keep_qc_fails,task):
     if not keep_qc_fails and not qc:
         return
 
-    svpi=SVCallPostprocessingInfo(cluster=cluster)
+    svpi=SVCallPostprocessingInfo(cluster=cluster) # 存储cluster对象
 
     if config.output_rnames or config.snf!=None:
         rnames=list(set(k.read_qname for k in leads))
     else:
         rnames=None
 
+    # 检出sv，以SVCall表示
     svcall=SVCall(contig=cluster.contig,
                   pos=svstart,
                   id=f"{svtype}.{task.sv_id:X}S{task.id:X}",
@@ -172,6 +187,7 @@ def call_from(cluster,config,keep_qc_fails,task):
                   fwd=support_fwd,
                   rev=support_rev)
 
+    # 补充SV信息
     if svtype=="BND":
         resolve_bnd(svcall,cluster,config)
     elif svtype=="INS":
@@ -212,7 +228,10 @@ def merge_inner_bounds(leads,config):
     return pos,svlen,util.stdev(util.trim((v for k,v in read_starts.items()))),util.stdev(util.trim((v for k,v in read_svlengths.items())))
 
 def resolve_bnd(svcall,cluster,config):
-    mate_contig=util.most_common_top([lead.bnd_info.mate_contig for lead in cluster.leads])
+    """
+    对于BND类型，设置svcall的ALT等信息
+    """
+    mate_contig=util.most_common_top([lead.bnd_info.mate_contig for lead in cluster.leads]) # 返回出现次数最多的contig
     selected=[lead for lead in cluster.leads if lead.bnd_info.mate_contig==mate_contig]
     mate_ref_start=util.center([lead.bnd_info.mate_ref_start for lead in selected])
     is_first=util.most_common_top([lead.bnd_info.is_first for lead in selected])

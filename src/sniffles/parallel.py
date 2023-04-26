@@ -49,6 +49,9 @@ class Task:
         return externals,self.lead_provider.read_count
 
     def call_candidates(self,keep_qc_fails,config):
+        """
+        迭代每一种sv，从leads计算cluster，再检测svcall。
+        """
         candidates=[]
         # 迭代每种类型的sv
         for svtype in sv.TYPES:
