@@ -19,13 +19,20 @@ from sniffles import consensus
 import math
 
 def annotate_sv(svcall,config):
+    """
+    丰富svcall的信息，例如分型、确定基因型、计算INS的ALT序列
+    """
+
+    # 对sv进行分型
     if config.phase:
         phase=phase_sv(svcall,config)
     else:
         phase=None
 
+    # 检测sv的基因型
     genotype_sv(svcall,config,phase)
 
+    # 对于INS类型，需要给出ALT的序列
     if svcall.svtype=="INS" and not config.symbolic:
         merged_leads=[l for l in svcall.postprocess.cluster.leads if l.seq!=None]
 
@@ -33,6 +40,7 @@ def annotate_sv(svcall,config):
             best_lead=merged_leads[0]
             best_index=0
             best_diff=abs(len(best_lead.seq) - svcall.svlen) + abs(best_lead.ref_start - svcall.pos)*1.5
+            # 迭代每个lead，获取最佳lead
             for i,ld in enumerate(merged_leads):
                 if i==0:
                     continue
@@ -53,6 +61,7 @@ def annotate_sv(svcall,config):
 
 
             if len(merged_leads) >= config.consensus_min_reads and not config.no_consensus:
+                # 需要计算consensus
                 klen=config.consensus_kmer_len
                 skip=config.consensus_kmer_skip_base+int(len(best_lead.seq)*config.consensus_kmer_skip_seqlen_mult)
                 skip_repetitive=skip
@@ -133,6 +142,9 @@ def coverage_fulfill(requests_for_coverage,calls,lead_provider,config):
     return average_coverage_fwd,average_coverage_rev
 
 def qc_sv_support(svcall,coverage_global,config):
+    """
+    对sv支持的reads数目进行qc。
+    """
     if config.minsupport == "auto":
         if not qc_support_auto(svcall,coverage_global,config):
             svcall.filter="SUPPORT_MIN"
@@ -144,18 +156,28 @@ def qc_sv_support(svcall,coverage_global,config):
     return True
 
 def rescale_support(svcall,config):
+    """
+    校正long INS支撑的leads数目。
+    """
     if svcall.svtype!="INS" or svcall.svlen < config.long_ins_length:
+        # 非long INS
         return svcall.support
     else:
+        # long INS
         base=svcall.support + svcall.get_info("SUPPORT_LONG")
         scale_factor=config.long_ins_rescale_mult*(float(svcall.svlen)/config.long_ins_length)
         return round(base*(config.long_ins_rescale_base+scale_factor))
 
 def qc_support_auto(svcall,coverage_global,config):
+    """
+    sv的leads数目是否超过最小阈值
+    """
     support=rescale_support(svcall,config)
     #if svcall.svtype=="INS":
     #    coverage_list=[svcall.coverage_center]
     #else:
+    # 优先使用上下游的覆盖度，再使用sv起始、中间、结尾的覆盖度
+    # 如果以上覆盖度都没有，则使用整个task区域的平均覆盖度
     coverage_list=[svcall.coverage_upstream,svcall.coverage_downstream]
     coverage_list=[c for c in coverage_list if c!=None and c!=0]
     if len(coverage_list)==0:
@@ -169,24 +191,33 @@ def qc_support_auto(svcall,coverage_global,config):
         if coverage_regional==0:
             coverage_regional=coverage_global
     coverage=(coverage_regional*config.minsupport_auto_regional_coverage_weight+coverage_global*(1.0-config.minsupport_auto_regional_coverage_weight))
-    min_support=round(config.minsupport_auto_base+config.minsupport_auto_mult*coverage)
+    min_support=round(config.minsupport_auto_base+config.minsupport_auto_mult*coverage) # 1.5 + 0.1 * coverage?
     return support >= min_support
     #return True
 
 def qc_support_const(svcall,config):
+    """
+    直接比较sv的leads与minsupport的关系
+    """
     #svcall.set_info("MINSUPPORT",config.minsupport)
     return svcall.support >= config.minsupport
 
 def qc_sv(svcall,config):
+    """
+    根据一系列条件对svcall进行QC。
+    """
     if config.qc_stdev:
+        # 对sv起始位置进行qc
         stdev_pos=svcall.get_info("STDEV_POS")
         if stdev_pos > config.qc_stdev_abs_max:
             svcall.filter="STDEV_POS"
             return False
+        
         if svcall.svtype!="BND" and stdev_pos / abs(svcall.svlen) > 2.0:
             svcall.filter="STDEV_POS"
             return False
 
+        # 对sv的长度进行QC
         stdev_len = svcall.get_info("STDEV_LEN")
         if stdev_len != None:
             if svcall.svtype != "BND" and stdev_len / abs(svcall.svlen) > 1.0:
@@ -196,23 +227,30 @@ def qc_sv(svcall,config):
                 svcall.filter="STDEV_LEN"
                 return False
 
+    # sv长度小于阈值
     if abs(svcall.svlen) < config.minsvlen:
         svcall.filter="SVLEN_MIN"
         return False
 
     #if (svcall.coverage_upstream != None and svcall.coverage_upstream < config.qc_coverage) or (svcall.coverage_downstream != None and svcall.coverage_downstream < config.qc_coverage):
+    # 非DEL、INS类型，sv中部的coverage不能小于阈值
     if svcall.svtype != "DEL" and svcall.svtype != "INS" and (svcall.coverage_center != None and svcall.coverage_center < config.qc_coverage):
         svcall.filter="COV_MIN"
         return False
 
     if svcall.svtype == "DEL" and config.long_del_length != -1 and abs(svcall.svlen) >= config.long_del_length and not config.non_germline:
+        # 胚系模式下，long del
+        # 中部coverage > 上下游平均值 * 0.66
         if svcall.coverage_center != None and svcall.coverage_upstream != None and svcall.coverage_downstream != None and svcall.coverage_center > (svcall.coverage_upstream+svcall.coverage_downstream)/2.0 * config.long_del_coverage:
             svcall.filter="COV_CHANGE"
             return False
     elif svcall.svtype=="INS" and ( (svcall.coverage_upstream != None and svcall.coverage_upstream < config.qc_coverage) or (svcall.coverage_downstream != None and svcall.coverage_downstream < config.qc_coverage)):
+        # INS类型，上游或者下游的覆盖度低于阈值
         svcall.filter="COV_CHANGE"
         return False
     elif svcall.svtype == "DUP" and config.long_dup_length != -1 and abs(svcall.svlen) >= config.long_dup_length and not config.non_germline:
+        # 胚系模式，long DUP类型
+        # 中部覆盖度 < 上下游平均值 * 1.33
         if svcall.coverage_center != None and svcall.coverage_upstream != None and svcall.coverage_downstream != None and svcall.coverage_center < (svcall.coverage_upstream+svcall.coverage_downstream)/2.0 * config.long_dup_coverage:
             svcall.filter="COV_CHANGE"
             return False
@@ -248,9 +286,9 @@ def likelihood_ratio(q1,q2):
 
 def genotype_sv(svcall,config,phase):
     normalization_target=250
-    hom_ref_p=config.genotype_error
-    het_p=(1.0/config.genotype_ploidy) # - config.genotype_error
-    hom_var_p=1.0 - config.genotype_error
+    hom_ref_p=config.genotype_error # 0.05, leads的假阳性率
+    het_p=(1.0/config.genotype_ploidy) # - config.genotype_error, 目前只支持二倍体，因此为1/2
+    hom_var_p=1.0 - config.genotype_error # 0.95
     coverage=0
 
     #Count inline events only once per read, but split events as individual alignments, as in coverage calculation
@@ -326,7 +364,10 @@ def genotype_sv(svcall,config,phase):
     svcall.set_info("AF",af)
 
 def phase_sv(svcall,config):
-    reads_phases={lead.read_id[0]: (lead.read_id[1],lead.read_id[2]) for lead in svcall.postprocess.cluster.leads}
+    """
+    根据svcall中leads的HP/PS tag，计算svcall的HP标签。
+    """
+    reads_phases={lead.read_id[0]: (lead.read_id[1],lead.read_id[2]) for lead in svcall.postprocess.cluster.leads} # leadprovider中把PS信息保存到了read id中
     hp_list=util.most_common(hp for hp,ps in reads_phases.values())
     ps_list=util.most_common(ps for hp,ps in reads_phases.values())
 
@@ -337,8 +378,8 @@ def phase_sv(svcall,config):
     if ps==None:
         ps="NULL"
 
-    other_hp_support=sum(other_supp for other_supp, other_hp in hp_list if other_hp != hp and other_hp != "NULL")
-    other_ps_support=sum(other_supp for other_supp, other_ps in ps_list if other_ps != ps and other_ps != "NULL")
+    other_hp_support=sum(other_supp for other_supp, other_hp in hp_list if other_hp != hp and other_hp != "NULL") # 其他HP标签次数总和
+    other_ps_support=sum(other_supp for other_supp, other_ps in ps_list if other_ps != ps and other_ps != "NULL") # 其他PS标签次数总和
 
     hp_filter="FAIL"
     if hp != "NULL" and hp_support > 0 and float(other_hp_support)/(hp_support+other_hp_support) < config.phase_conflict_threshold:

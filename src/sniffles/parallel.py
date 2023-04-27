@@ -64,6 +64,9 @@ class Task:
         return candidates
 
     def finalize_candidates(self,candidates,keep_qc_fails,config):
+        """
+        迭代每个svcall，执行一系列过滤，返回所有通过过滤的svcall。
+        """
         passed=[]
         for svcall in candidates:
             svcall.qc=svcall.qc and postprocessing.qc_sv(svcall,config)
