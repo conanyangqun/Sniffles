@@ -136,6 +136,9 @@ def make_group(lead,klen,skip,repetitive_kmers):
                  support=[lead])
 
 def iter_kmers(seq,klen,skip):
+    """
+    根据klen和skip生成seq的子序列。
+    """
     for i in range(0,len(seq)-klen,skip):
         yield (i,seq[i:i+klen])
 
@@ -273,6 +276,9 @@ def from_leads(leads, initial_lead, max_grp=3, klen=15, skip=1, skip_repetitive=
 
 
 def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False):
+    """
+    根据best lead和其他leads，计算INS的ALT序列。
+    """
     consensus_min=2
     maxshift=klen
     minspan=0.2
@@ -284,33 +290,46 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
     alignments=[]
     anchors={}
     taboo=set()
+    # 迭代每个kmer，先放入anchors。如果再次遇见此kmer，放入taboo中，并从anchors中删除。
+    # 所以，taboo存储出现2次以上的kmer，anchors存储出现1次的kmer（unqiue）。
     for i, kmer in iter_kmers(best_lead.seq,klen=klen,skip=skip_repetitive):
         if kmer in taboo:
             continue
+
         if kmer in anchors:
             del anchors[kmer]
             taboo.add(kmer)
             continue
+
         anchors[kmer]=i
 
+    # 迭代每条其他的lead，与best_lead比较，分析一致性序列。
     for leadi,lead in enumerate(other_leads):
         last_i=None
         last_j=None
         conseq=""
         span=0
+        # 迭代lead上每条kmer，比较每个unique kmer。
         for j, kmer in iter_kmers(lead.seq,klen=klen,skip=skip):
             if not kmer in anchors:
                 continue
+
             i=anchors[kmer]
             if abs(i-j) > maxshift:
+                # 两条lead上的unique kmer位置之差大于kmer长度
                 continue
+
             if last_i != None and i <= last_i:
+                # 当前kmer必须位于之前kmer的后面，确保顺序不变
                 continue
 
             if last_i == None:
                 if j>0:
+                    # 第一个unique kmer，且该kmer在当前lead上不是第一个kmer。
                     conseq="-"*i
             else:
+                # 从第二个unique kmer开始
+                # 此部分代码待研究
                 fwd_i=i-last_i
                 fwd_j=j-last_j
                 if len(conseq)+fwd_j > len(best_lead.seq):
@@ -357,6 +376,7 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
         if span/float(len(best_lead.seq)) > minspan:
             alignments.append(conseq)
 
+    # 计算每个位置最大的覆盖度
     maxal=1
     for i in range(len(best_lead.seq)):
         maxal=max(maxal,len([best_lead.seq[i]]+[a[i] for a in alignments if not a[i] in "^_"]))
@@ -370,6 +390,7 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
         else:
             top=util.most_common([best_lead.seq[i]]+al)
             if len(top)>1 and top[0][0]-top[1][0] >= minbestdiff:
+                # 至少2种碱基，并且A要比B多3条read
                 flattened+=top[0][1]
             else:
                 flattened+=best_lead.seq[i]

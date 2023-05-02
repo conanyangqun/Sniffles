@@ -36,6 +36,7 @@ def annotate_sv(svcall,config):
     if svcall.svtype=="INS" and not config.symbolic:
         merged_leads=[l for l in svcall.postprocess.cluster.leads if l.seq!=None]
 
+        # 迭代所有leads，寻找最佳lead。
         if len(merged_leads):
             best_lead=merged_leads[0]
             best_index=0
@@ -50,7 +51,7 @@ def annotate_sv(svcall,config):
                     best_index=i
                     best_diff=curr_diff
 
-            merged_leads.pop(best_index)
+            merged_leads.pop(best_index) # 移除最佳lead
             #merged_leads_new=list()
 
             #for lead in merged_leads:
@@ -61,9 +62,9 @@ def annotate_sv(svcall,config):
 
 
             if len(merged_leads) >= config.consensus_min_reads and not config.no_consensus:
-                # 需要计算consensus
-                klen=config.consensus_kmer_len
-                skip=config.consensus_kmer_skip_base+int(len(best_lead.seq)*config.consensus_kmer_skip_seqlen_mult)
+                # 需要计算INS的consensus序列
+                klen=config.consensus_kmer_len # 6
+                skip=config.consensus_kmer_skip_base+int(len(best_lead.seq)*config.consensus_kmer_skip_seqlen_mult) # 3 + 1/500 * len
                 skip_repetitive=skip
 
                 svcall.alt=consensus.novel_from_reads(best_lead,merged_leads,klen=klen,skip=skip,skip_repetitive=skip_repetitive)
@@ -268,6 +269,9 @@ def binomial_coef(n,k):
     return math.factorial(n)/(math.factorial(k)*math.factorial(n-k))
 
 def binomial_probability(k,n,p):
+    """
+    计算二项概率分布。
+    """
     try:
         #Binomial coef cancels out for likelihood ratios
         #return binomial_coef(n,k) * (p**k) * ((1.0-p)**(n-k))
@@ -276,6 +280,9 @@ def binomial_probability(k,n,p):
         return 1.0
 
 def likelihood_ratio(q1,q2):
+    """
+    计算似然比。
+    """
     if q1/q2>0:
         try:
             return math.log(q1/q2,10)
@@ -285,6 +292,9 @@ def likelihood_ratio(q1,q2):
         return 0
 
 def genotype_sv(svcall,config,phase):
+    """
+    根据svcall的覆盖度，计算sv的基因型信息，例如zscore、quality等。
+    """
     normalization_target=250
     hom_ref_p=config.genotype_error # 0.05, leads的假阳性率
     het_p=(1.0/config.genotype_ploidy) # - config.genotype_error, 目前只支持二倍体，因此为1/2
@@ -293,13 +303,15 @@ def genotype_sv(svcall,config,phase):
 
     #Count inline events only once per read, but split events as individual alignments, as in coverage calculation
     leads=svcall.postprocess.cluster.leads
-    support=rescale_support(svcall,config)
+    support=rescale_support(svcall,config) # 校正long INS支持的reads数目
 
+    # 根据不同的sv类型设定coverage_list, coverage.
     if svcall.svtype=="INS":
         coverage_list=[svcall.coverage_center]
     else:
         if svcall.svtype=="DUP":
             if False and svcall.coverage_start!=None and svcall.coverage_end!=None:
+                # 这段代码永不执行
                 if svcall.coverage_start>svcall.coverage_end:
                     coverage_list=[svcall.coverage_end]
                 else:
@@ -314,8 +326,12 @@ def genotype_sv(svcall,config,phase):
             coverage_list=[svcall.coverage_start,svcall.coverage_center,svcall.coverage_end]
 
     coverage_list=[c for c in coverage_list if c!=None and c!=0]
+
+    # 覆盖度为0，直接返回
     if len(coverage_list)==0:
         return
+    
+    # 计算得到平均覆盖度
     coverage+=round(sum(coverage_list)/len(coverage_list))
 
     if support > coverage:
@@ -323,10 +339,13 @@ def genotype_sv(svcall,config,phase):
 
     af=support / float(coverage)
 
-    genotype_p=[((0,0),hom_ref_p),
-                ((0,1),het_p),
-                ((1,1),hom_var_p)]
+    genotype_p = [
+        ((0,0),hom_ref_p),
+        ((0,1),het_p),
+        ((1,1),hom_var_p)
+    ]
 
+    # 根据normalization_target对coverage和support进行校正
     max_lead=max(support,coverage)
     if max_lead>normalization_target:
         norm=normalization_target/float(max_lead)
@@ -336,23 +355,27 @@ def genotype_sv(svcall,config,phase):
         normalized_support=support
         normalized_coverage=coverage
 
+    # 计算基因型的后验概率
     genotype_likelihoods=[]
     for gt, p in genotype_p:
         q=binomial_probability(normalized_support,normalized_coverage,p)
         genotype_likelihoods.append((gt,q))
     genotype_likelihoods.sort(key=lambda k: k[1], reverse=True)
 
+    # 校正基因型概率
     sum_likelihoods=sum(q for gt,q in genotype_likelihoods)
     normalized_likelihoods=[ (gt,(q/sum_likelihoods)) for gt,q in genotype_likelihoods]
 
+    # 计算基因型zscore和quality
     gt1,q1=normalized_likelihoods[0]
     gt2,q2=normalized_likelihoods[1]
     qz=[q for gt,q in normalized_likelihoods if gt==(0,0)][0]
-    genotype_z_score = min(60,int((-10) * likelihood_ratio(qz,q1)))
-    genotype_quality = min(60,int((-10) * likelihood_ratio(q2,q1)))
+    genotype_z_score = min(60,int((-10) * likelihood_ratio(qz,q1))) # -10 * log_{10} qz/q1
+    genotype_quality = min(60,int((-10) * likelihood_ratio(q2,q1))) # -10 * log_{10} q2/q1
 
     is_long_ins=(svcall.svtype=="INS" and svcall.svlen >= config.long_ins_length)
     if genotype_z_score < config.genotype_min_z_score and not config.non_germline and not is_long_ins:
+        # 胚系，非long INS，基因型Z-score低于阈值（5）
         if svcall.filter=="PASS":
             svcall.filter="GT"
 
@@ -365,7 +388,8 @@ def genotype_sv(svcall,config,phase):
 
 def phase_sv(svcall,config):
     """
-    根据svcall中leads的HP/PS tag，计算svcall的HP标签。
+    根据svcall中leads的HP/PS tag，计算svcall的phase情况，设置PHASE信息。
+    返回None或者HP的索引。
     """
     reads_phases={lead.read_id[0]: (lead.read_id[1],lead.read_id[2]) for lead in svcall.postprocess.cluster.leads} # leadprovider中把PS信息保存到了read id中
     hp_list=util.most_common(hp for hp,ps in reads_phases.values())
