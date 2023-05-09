@@ -259,8 +259,9 @@ def qc_sv(svcall,config):
     return True
 
 def qc_sv_post_annotate(svcall,config):
+    # 根据SV的基因型、覆盖度进行QC
     if (len(svcall.genotypes)==0 or (svcall.genotypes[0][0]!="." and svcall.genotypes[0][0]+svcall.genotypes[0][1]<2)) and (svcall.coverage_center != None and svcall.coverage_center < config.qc_coverage):
-        svcall.filter="COV_MIN"
+        svcall.filter="COV_MIN" # 覆盖度不足
         return False
 
     return True
@@ -296,9 +297,11 @@ def genotype_sv(svcall,config,phase):
     根据svcall的覆盖度，计算sv的基因型信息，例如zscore、quality等。
     """
     normalization_target=250
+    # 基因型的先验概率
     hom_ref_p=config.genotype_error # 0.05, leads的假阳性率
     het_p=(1.0/config.genotype_ploidy) # - config.genotype_error, 目前只支持二倍体，因此为1/2
     hom_var_p=1.0 - config.genotype_error # 0.95
+    
     coverage=0
 
     #Count inline events only once per read, but split events as individual alignments, as in coverage calculation
@@ -375,7 +378,7 @@ def genotype_sv(svcall,config,phase):
 
     is_long_ins=(svcall.svtype=="INS" and svcall.svlen >= config.long_ins_length)
     if genotype_z_score < config.genotype_min_z_score and not config.non_germline and not is_long_ins:
-        # 胚系，非long INS，基因型Z-score低于阈值（5）
+        # 胚系，非long INS，基因型Z-score低于阈值（5），不通过基因型过滤
         if svcall.filter=="PASS":
             svcall.filter="GT"
 
@@ -383,6 +386,7 @@ def genotype_sv(svcall,config,phase):
         a,b=".","."
     else:
         a,b=gt1
+    # 添加基因型和AF等信息
     svcall.genotypes[0]=(a,b,genotype_quality,coverage-support,support,phase)
     svcall.set_info("AF",af)
 

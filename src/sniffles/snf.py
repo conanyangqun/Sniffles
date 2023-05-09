@@ -31,6 +31,7 @@ class SNFile:
         self.total_length=0
 
     def store(self,svcand):
+        # 把候选sv存储到blocks窗口中
         block_index=int(svcand.pos/self.config.snf_block_size)*self.config.snf_block_size
         if not block_index in self.blocks:
             self.blocks[block_index]={svtype: [] for svtype in sv.TYPES}
@@ -40,6 +41,7 @@ class SNFile:
         self.blocks[block_index][svcand.svtype].append(svcand)
 
     def annotate_block_coverages(self,lead_provider,resolution=500):
+        # 根据lead_provider中的覆盖度，每n个窗口统计一次覆盖度，记录到block中
         config=self.config
         start_bin=lead_provider.covrtab_min_bin
         end_bin=int(lead_provider.end/config.coverage_binsize)*config.coverage_binsize
@@ -52,6 +54,7 @@ class SNFile:
         coverage_binsize_combine=self.config.coverage_binsize_combine
         snf_block_size=config.snf_block_size
 
+        # 迭代每个覆盖度窗口
         for bin in range(start_bin, end_bin+config.coverage_binsize,config.coverage_binsize):
             if bin in lead_provider.covrtab_fwd:
                 coverage_fwd+=lead_provider.covrtab_fwd[bin]
@@ -62,6 +65,7 @@ class SNFile:
             coverage_sum+=coverage_fwd+coverage_rev
             bin_count+=1
 
+            # 以一定数目合并覆盖度窗口
             if bin%coverage_binsize_combine==0:
                 block_index=int(bin/snf_block_size)*snf_block_size
 
@@ -71,7 +75,7 @@ class SNFile:
                         self.blocks[block_index]={svtype: [] for svtype in sv.TYPES}
                         self.blocks[block_index]["_COVERAGE"]={}
 
-                    self.blocks[block_index]["_COVERAGE"][bin]=coverage_total_curr
+                    self.blocks[block_index]["_COVERAGE"][bin]=coverage_total_curr # 每n个窗口统计覆盖度，存储到blocks中
 
                 coverage_sum=0
                 bin_count=0
@@ -83,12 +87,13 @@ class SNFile:
         return pickle.loads(data)
 
     def write_and_index(self):
+        # 把blocks的数据输出到二进制文件并索引
         offset=0
         for block_id in sorted(self.blocks):
             data=gzip.compress(self.serialize_block(block_id))
             self.handle.write(data)
             data_len=len(data)
-            self.index[block_id]=(offset,data_len)
+            self.index[block_id]=(offset,data_len) # 二进制数据偏移量
             offset+=data_len
             self.total_length+=data_len
 
@@ -125,9 +130,11 @@ class SNFile:
         return blocks
 
     def get_index(self):
+        # 返回index
         return self.index
 
     def get_total_length(self):
+        # 返回总长度
         return self.total_length
 
     def close(self):

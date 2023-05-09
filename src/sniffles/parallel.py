@@ -82,6 +82,7 @@ class Task:
             if not keep_qc_fails and not svcall.qc:
                 continue
 
+            # 清空svcall中保存的leads信息
             svcall.finalize() #Remove internal information (not written to output) before sending to mainthread for VCF writing
             passed.append(svcall)
         return passed
@@ -231,20 +232,24 @@ def Main_Internal(proc_id,config,pipe):
             _,read_count=task.build_leadtab(config)
             svcandidates=task.call_candidates(qc,config)
             svcalls=task.finalize_candidates(svcandidates,not qc,config)
+
+            # 是否输出所有的svcalls
             if config.no_qc:
                 result["svcalls"]=svcalls
             else:
                 result["svcalls"]=[s for s in svcalls if s.qc]
 
+            # 是否输出snf文件
             if config.snf != None: # and len(svcandidates):
                 # 每个task生成snf文件
                 snf_filename=f"{config.snf}.tmp_{task.id}.snf"
 
+                # 把候选的sv输出到snf文件中
                 with open(snf_filename,"wb") as handle:
                     snf_out=snf.SNFile(config,handle)
                     for cand in svcandidates:
                         snf_out.store(cand)
-                    snf_out.annotate_block_coverages(task.lead_provider)
+                    snf_out.annotate_block_coverages(task.lead_provider) # 给block添加覆盖度信息
                     snf_out.write_and_index()
                     handle.close()
                 result["snf_filename"]=snf_filename
@@ -262,9 +267,9 @@ def Main_Internal(proc_id,config,pipe):
             result["task_id"]=task.id
             result["processed_read_count"]=read_count
             result["coverage_average_total"]=task.coverage_average_total
-            pipe.send(["return_call_sample",result])
+            pipe.send(["return_call_sample",result]) # 通过管道把结果发送回主进程
             del task
-            gc.collect() # ?
+            gc.collect() # 垃圾回收
 
         elif command=="genotype_vcf":
             task=arg
