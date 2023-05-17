@@ -258,6 +258,7 @@ def Main_Internal(proc_id,config,pipe):
                 result["snf_candidate_count"]=len(svcandidates)
                 result["has_snf"]=True
             else:
+                # 不生成snf文件
                 result["has_snf"]=False
 
             #if config.vcf != None:
@@ -272,6 +273,7 @@ def Main_Internal(proc_id,config,pipe):
             gc.collect() # 垃圾回收
 
         elif command=="genotype_vcf":
+            # genotype_vcf模式
             task=arg
             result={}
 
@@ -280,17 +282,21 @@ def Main_Internal(proc_id,config,pipe):
             svcandidates=task.call_candidates(qc,config=config)
             svcalls=task.finalize_candidates(svcandidates,not qc,config=config)
 
+            # 处理目标sv
             binsize=5000
             binedge=int(binsize/10)
-            genotype_svs_svtypes_bins={svtype:{} for svtype in sv.TYPES}
+            genotype_svs_svtypes_bins={svtype:{} for svtype in sv.TYPES} # 以svtype -> bin -> sv存储
             for genotype_sv in task.genotype_svs:
+                # 迭代每个目标sv
                 genotype_sv.genotype_match_sv=None
                 genotype_sv.genotype_match_dist=math.inf
 
                 if not genotype_sv.svtype in genotype_svs_svtypes_bins:
                     #TODO: Warn about unsupported SVTYPE
+                    # 目标sv不在程序支持的sv类型中
                     continue
-
+                
+                # 考虑sv跨多个bin的可能性
                 bins=[int(genotype_sv.pos/binsize)*binsize]
                 if genotype_sv.pos%binsize < binedge:
                     bins.append((int(genotype_sv.pos/binsize)-1)*binsize)
@@ -302,11 +308,13 @@ def Main_Internal(proc_id,config,pipe):
                          genotype_svs_svtypes_bins[genotype_sv.svtype][bin]=[]
                     genotype_svs_svtypes_bins[genotype_sv.svtype][bin].append(genotype_sv)
 
+            # 迭代每个候选sv，判断是否与目标sv匹配
             for cand in svcandidates:
                 bin=int(cand.pos/binsize)*binsize
                 if not bin in genotype_svs_svtypes_bins[cand.svtype]:
                     continue
                 if cand.svtype=="BND":
+                    # BND类型
                     for genotype_sv in genotype_svs_svtypes_bins[cand.svtype][bin]:
                         dist=abs(genotype_sv.pos - cand.pos)
                         #if minlen>0 and dist < genotype_sv.genotype_match_dist and dist <= config.cluster_merge_bnd * 2:
@@ -315,22 +323,25 @@ def Main_Internal(proc_id,config,pipe):
                                 genotype_sv.genotype_match_sv=cand
                                 genotype_sv.genotype_match_dist=dist
                 else:
+                    # 非BND类型
                     for genotype_sv in genotype_svs_svtypes_bins[cand.svtype][bin]:
                         dist=abs(genotype_sv.pos - cand.pos) + abs(abs(genotype_sv.svlen) - abs(cand.svlen))
                         minlen=float(min(abs(genotype_sv.svlen),abs(cand.svlen)))
                         if minlen>0 and dist < genotype_sv.genotype_match_dist and dist <= config.combine_match * math.sqrt(minlen) and dist <= config.combine_match_max:
                             genotype_sv.genotype_match_sv=cand
                             genotype_sv.genotype_match_dist=dist
-
+            
+            # 计算sv的覆盖度信息
             postprocessing.coverage(task.genotype_svs,task.lead_provider,config)
 
             #Determine genotypes for unmatched input SVs
+            # 如果某个sv有覆盖度，则设置基因型为0，否则设置为none
             for svcall in task.genotype_svs:
                 coverage_list=[svcall.coverage_start,svcall.coverage_center,svcall.coverage_end]
                 coverage_list=[c for c in coverage_list if c!=None]
                 if len(coverage_list)==0:
                     return
-                coverage=round(sum(coverage_list)/len(coverage_list))
+                coverage=round(sum(coverage_list)/len(coverage_list)) # 平均覆盖度
                 svcall.genotypes={}
                 if coverage>0:
                     svcall.genotypes[0]=(0,0,0,coverage,0,None)
@@ -341,7 +352,7 @@ def Main_Internal(proc_id,config,pipe):
             result["task_id"]=task.id
             result["processed_read_count"]=read_count
             result["svcalls"]=task.genotype_svs
-            pipe.send(["return_genotype_vcf",result])
+            pipe.send(["return_genotype_vcf",result]) # 返回结果
             del task
             gc.collect()
 
