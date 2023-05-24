@@ -286,6 +286,7 @@ def Main_Internal(proc_id,config,pipe):
             binsize=5000
             binedge=int(binsize/10)
             genotype_svs_svtypes_bins={svtype:{} for svtype in sv.TYPES} # 以svtype -> bin -> sv存储
+            # 把目标svs分bin存储
             for genotype_sv in task.genotype_svs:
                 # 迭代每个目标sv
                 genotype_sv.genotype_match_sv=None
@@ -340,7 +341,7 @@ def Main_Internal(proc_id,config,pipe):
                 coverage_list=[svcall.coverage_start,svcall.coverage_center,svcall.coverage_end]
                 coverage_list=[c for c in coverage_list if c!=None]
                 if len(coverage_list)==0:
-                    return
+                    return # 什么影响？程序返回？
                 coverage=round(sum(coverage_list)/len(coverage_list)) # 平均覆盖度
                 svcall.genotypes={}
                 if coverage>0:
@@ -357,6 +358,7 @@ def Main_Internal(proc_id,config,pipe):
             gc.collect()
 
         elif command=="combine":
+            # combine模式
             task=arg
             result={}
 
