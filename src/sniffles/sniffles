@@ -402,7 +402,7 @@ def Sniffles2_Main(config,processes):
     tasks_todo=[t for t in tasks_list]
 
     if config.vcf != None and config.sort:
-        # 用于保存排序后的VCF？
+        # 根据task id保存svcalls
         task_id_calls={}
 
     # 启动分析进程
@@ -549,21 +549,27 @@ def Sniffles2_Main(config,processes):
     #
     lastcall=None
     if (config.mode=="call_sample" or config.mode=="combine") and config.vcf != None and config.sort:
+        # call_sample, combine模式，输出排序的VCF文件
         #TODO: Look into calls placed outside their respective task's range
+        # 迭代每个task和每个svcall，判断svcall是否在task范围内。寻找svcall合适的task范围。
         reassigned_count=0
         ignored_count=0
         sort_start_time=time.time()
         for task in tasks_list:
             if not task.id in task_id_calls:
                 continue
+            # 根据task id获取检出的svcalls。
             for call in sorted(task_id_calls[task.id],key=lambda call: call.pos):
                 if call.pos < task.start or call.pos >= task.end or call.contig != task.contig:
+                    # svcall不属于当前的task
                     new_target_tasks=list(task for start,end,task in contig_tasks_intervals[call.contig] if call.pos >= task.start and call.pos < task.end)
                     if len(new_target_tasks)!=1:
                         print(f"WARNING: Unable to assign call at {call.contig}:{call.pos} to unambiguous task. (got {len(new_target_tasks)} intervals). SVCall={call}")
                         if len(new_target_tasks)==0:
+                            # 未找到svcall的task
                             continue
-
+                    
+                    # 给svcall分配新的task
                     new_task_id=new_target_tasks[0].id
                     if not new_task_id in task_id_calls:
                         task_id_calls[new_task_id]=[]
@@ -571,6 +577,7 @@ def Sniffles2_Main(config,processes):
                     #print(f"Migrated a call from {task} to {new_target_tasks[0].data}: {call}")
                     reassigned_count+=1
 
+        # 按照顺序输出svcall。
         for task in tasks_list: #Tasks are already sorted by contig/coordinate (from .bam index)
             if not task.id in task_id_calls:
                 continue
@@ -591,9 +598,11 @@ def Sniffles2_Main(config,processes):
         #
         # Combine regional temporary .snf files from workers
         #
+        # call_sample模式，输出SNF文件。
         main_index={}
         offset=0
         parts_sorted=sorted(snf_parts,key=lambda p: p["task"].id)
+        # 迭代每个部分，统计snf文件的头信息
         for part in parts_sorted:
             part_contig=part["task"].contig
             if not part_contig in main_index:
@@ -608,6 +617,7 @@ def Sniffles2_Main(config,processes):
         header_json=json.dumps(header, default=lambda obj: "<Unstored_Object>")+"\n"
         snf_out.handle.write(header_json.encode())
 
+        # 迭代每个snf文件部分，输出文件内容
         for part in parts_sorted:
             with open(part["snf_filename"],"rb") as part_handle:
                 part_data=part_handle.read()
@@ -617,16 +627,19 @@ def Sniffles2_Main(config,processes):
 
         snf_out.close()
 
+    # 开发者模式，监控内存占用情况
     if DEV_MONITOR_MEM:
         print(f"[DEV: Total memory usage={dbg_get_total_memory_usage_MB():.2f}MB]") #TODO: Remove (prod)
 
     if config.mode=="genotype_vcf":
+        # genotype_vcf模式，按照原sv的顺序输出新的svcall结果。
         vcf_out.rewrite_header_genotype(vcf_in.header_str)
 
         for lineindex in genotype_lineindex_order:
             if lineindex in genotype_lineindex_svcalls_returned:
                 vcf_out.rewrite_genotype(genotype_lineindex_svcalls_returned[lineindex])
 
+    # 关闭vcf输出文件
     if config.vcf!=None:
         vcf_out.close()
         if config.vcf_output_bgz:
@@ -646,6 +659,7 @@ def Sniffles2_Main(config,processes):
     #
     #Finalize
     #
+    # 正常关闭进程。
     for proc in processes:
         proc.pipe_main.send(["finalize",None])
 
