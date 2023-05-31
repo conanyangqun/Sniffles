@@ -59,6 +59,7 @@ class VCF:
 
         self.default_genotype=config.genotype_none
 
+        # 设计FORMAT信息
         if config.mode=="combine":
             # GT:GQ:DR:DV:ID
             self.genotype_format=config.genotype_format+":ID"
@@ -82,7 +83,7 @@ class VCF:
 
     def write_header(self,contigs_lengths):
         """
-        输出头信息到VCF输出文件中。
+        输出头信息到VCF输出文件中。contigs信息来自于数据。
         """
         self.write_header_line("fileformat=VCFv4.2")
         self.write_header_line(f"source={self.config.version}_{self.config.build}")
@@ -243,6 +244,8 @@ class VCF:
                     line=line.decode("utf-8")
                 line_index+=1
                 line_strip=line.strip()
+
+                # 解析头信息
                 if line_strip=="" or line_strip[0]=="#":
                     if line_strip[0]=="#":
                         self.header_str+=line_strip+"\n"
@@ -250,6 +253,7 @@ class VCF:
 
                 CHROM,POS,ID,REF,ALT,QUAL,FILTER,INFO=line.split("\t")[:8]
 
+                # 解析INFO列
                 info_dict={}
                 for info_item in INFO.split(";"):
                     if "=" in info_item:
@@ -278,6 +282,8 @@ class VCF:
                                fwd=0,
                                rev=0,
                                nm=-1)
+                
+                # 判断sv的类型
                 if len(call.alt)>len(call.ref):
                     call.svtype="INS"
                     call.svlen=len(call.alt)
@@ -285,7 +291,7 @@ class VCF:
                 else:
                     call.svtype="DEL"
                     call.svlen=-len(call.ref)
-                    call.end=call.pos+call.svlen
+                    call.end=call.pos+call.svlen # 对于del，end < pos.
 
                 if "SVTYPE" in info_dict:
                     call.svtype=info_dict["SVTYPE"]
@@ -297,6 +303,7 @@ class VCF:
                 if "END" in info_dict:
                     call.end=int(info_dict["END"])
 
+                # 解析BND类型
                 if call.svtype=="BND":
                     bnd_parts=call.alt.replace("]","[").split("[")
                     if len(bnd_parts)>2:
@@ -305,6 +312,7 @@ class VCF:
                     else:
                         raise ValueError("BND ALT not formatted according to VCF 4.2 specifications")
 
+                # 存储原VCF文件信息
                 call.raw_vcf_line=line_strip
                 call.raw_vcf_line_index=line_index
                 yield call

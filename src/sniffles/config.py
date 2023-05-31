@@ -23,6 +23,9 @@ class ArgFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescripti
     pass
 
 def tobool(v):
+    """
+    把可能的布尔值转换为合适的布尔值。
+    """
     if v==True or v==False:
         return v
     elif v.lower()=="true" or v=="1":
@@ -33,6 +36,9 @@ def tobool(v):
         raise argparse.ArgumentTypeError("Boolean value (True | False) required for argument")
 
 def from_cmdline():
+    """
+    解析命令行参数，返回配置变量config。
+    """
     header=f"Sniffles2: A fast structural variant (SV) caller for long-read sequencing data\n Version {BUILD}\n Contact: moritz.g.smolka@gmail.com"
     example=""" Usage example A - Call SVs for a single sample:
     sniffles --input sorted_indexed_alignments.bam --vcf output.vcf
@@ -181,6 +187,7 @@ def from_cmdline():
     config.command=" ".join(sys.argv)
 
     if config.dev_call_region != None:
+        # 开发者模式，设置检出区域
         region_contig,region_startend=config.dev_call_region.replace(",","").split(":")
         start,end=region_startend.split("-")
         config.dev_call_region=dict(contig=region_contig,start=int(start),end=int(end))

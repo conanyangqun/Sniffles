@@ -16,6 +16,9 @@ TYPES=["INS","DEL","DUP","INV","BND"]
 
 @dataclass
 class SVCallBNDInfo:
+    """
+    用来表示BND的mate。
+    """
     mate_contig: str
     mate_ref_start: int
     is_first: bool

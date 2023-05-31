@@ -109,14 +109,23 @@ def most_common_top(nums):
     return sorted(item for count,item in result if count==result[0][0])[0]
 
 def error(msg):
+    """
+    输出错误信息。
+    """
     sys.stderr.write("Sniffles2 Error: "+msg+"\n")
     sys.stderr.flush()
 
 def fatal_error(msg):
+    """
+    致命错误，打印错误，程序报错退出。
+    """
     error(msg+" (Fatal error, exiting.)")
     exit(1)
 
 def fatal_error_main(msg):
+    """
+    主程序致命错误，引起Sniffles2Exit异常
+    """
     error(msg+" (Fatal error, exiting.)")
     raise Sniffles2Exit
 

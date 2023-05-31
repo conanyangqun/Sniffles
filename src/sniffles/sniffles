@@ -54,6 +54,7 @@ def Sniffles2_Main(config,processes):
     # Determine Sniffles2 run mode
     #
 
+    # 解析输入文件
     input_ext=[f.split(".")[-1].lower() for f in config.input]
 
     if len(set(input_ext)) > 1:
@@ -83,7 +84,7 @@ def Sniffles2_Main(config,processes):
     else:
         util.fatal_error_main(f"Failed to determine run mode from input. Please specify either: A single .bam file - OR - one or more .snf files - OR - a single .tsv file containing a list of .snf files and optional sample ids as input. (supplied were: {list(set(input_ext))})")
 
-    # 判断其他参数合理性
+    # 判断参数的合理性
     if config.mode != "call_sample" and config.snf != None:
         util.fatal_error_main(f"--snf cannot be used with run mode {mode}")
 
@@ -154,7 +155,7 @@ def Sniffles2_Main(config,processes):
         genotype_lineindex_order=[] # sv的行索引
         genotype_lineindex_svs={} # 以sv的行索引为key，存储sv
         genotype_contig_svs={} # 以contig为单位存储svcall
-        genotype_lineindex_svcalls_returned={}
+        genotype_lineindex_svcalls_returned={} # ？
         # svcall为表示SV的类
         for svcall in vcf_in.read_svs_iter():
             if not svcall.contig in genotype_contig_svs:
@@ -180,8 +181,10 @@ def Sniffles2_Main(config,processes):
             vcf_output_info.append("multi-sample")
         else:
             vcf_output_info.append("single-sample")
+        
         if config.sort:
             vcf_output_info.append("sorted")
+        
         if config.vcf_output_bgz:
             vcf_output_info.append("bgzipped")
             vcf_output_info.append("tabix-indexed")
@@ -197,12 +200,14 @@ def Sniffles2_Main(config,processes):
             if not Path(config.vcf).parent.exists():
                 Path(config.vcf).parent.mkdir(parents=True)
             if config.vcf_output_bgz:
+                # bgzip and sort.
                 if not config.sort:
                     util.fatal_error_main(".gz (bgzip) output is only supported with sorting enabled")
                 vcf_handle=pysam.BGZFile(config.vcf,"w")
             else:
                 vcf_handle=open(config.vcf,"w")
 
+            # 输出的VCF对象
             vcf_out=vcf.VCF(config,vcf_handle)
 
         if config.mode=="call_sample" or config.mode=="combine":
@@ -234,7 +239,9 @@ def Sniffles2_Main(config,processes):
         #
         # Process .bam header
         #
-        total_mapped=bam_in.mapped # 比对的reads总数？
+        total_mapped=bam_in.mapped # 比对的reads总数
+
+        # 设置每个task最多处理的reads数
         if (config.threads==1 and not config.low_memory) or config.task_count_multiplier==0:
             # config.py中设置了task_count_multiplier = 0，因此总是执行此条件
             task_max_reads=total_mapped
@@ -255,9 +262,11 @@ def Sniffles2_Main(config,processes):
         # 根据reads数目计算任务数目
         for contig in bam_in.get_index_statistics():
             if task_max_reads==0:
+                # cram，一条染色体一个task。
                 task_count=1
             else:
-                task_count=max(1,math.ceil(contig.mapped / float(task_max_reads)))
+                task_count=max(1,math.ceil(contig.mapped / float(task_max_reads))) # bam，一条染色体一个task
+            
             contig_str=str(contig.contig)
             contig_length=bam_in.get_reference_length(contig_str)
             contig_lengths.append((contig_str, contig_length))
@@ -338,7 +347,7 @@ def Sniffles2_Main(config,processes):
         else:
             util.fatal_error_main("Failed to determine .snf files to be combined. Please specify either one or more .snf files OR a single .tsv file as input for multi-calling.")
 
-        # 读取snf文件
+        # 读取snf文件，从头部获取一些信息
         for input_filename, sample_id in input_snfs_sample_ids:
             snf_in=snf.SNFile(config,open(input_filename,"rb"),filename=input_filename)
             snf_in.read_header()
@@ -407,7 +416,7 @@ def Sniffles2_Main(config,processes):
 
     # 启动分析进程
     for proc in processes:
-        proc.process.start()
+        proc.process.start() # 调用parallel.Main()函数。
 
     # 打印分析日志
     print("")
@@ -473,6 +482,7 @@ def Sniffles2_Main(config,processes):
                 task=tasks_todo.pop(seed%len(tasks_todo)) # 随机选择一个task？
             else:
                 task=tasks_todo.pop()
+            
             proc=processes_free.pop()
             processes_busy.append(proc)
             assert(task.assigned_process_id==None) # 确保task没有被进程运行过
