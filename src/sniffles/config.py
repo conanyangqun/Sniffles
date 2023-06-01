@@ -194,7 +194,7 @@ def from_cmdline():
 
     #"--minsvlen" parameter is for final output filtering
     #for intermediate steps, a lower threshold is used to account for sequencing, mapping imprecision
-    config.minsvlen_screen=int(config.minsvlen_screen_ratio*config.minsvlen)
+    config.minsvlen_screen=int(config.minsvlen_screen_ratio*config.minsvlen) # 0.9 * 35
     #config.minsupport_screen=max(1,int(0.333*config.minsupport*(config.cluster_binsize/100.0)))
 
     if config.minsupport!="auto":

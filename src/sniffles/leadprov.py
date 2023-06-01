@@ -137,28 +137,31 @@ def CIGAR_listreadstart_rev(ops):
     else:
         return 0
 
-OPTAB={pysam.CMATCH:     (1,1,0),
-       pysam.CEQUAL:     (1,1,0),
-       pysam.CDIFF:      (1,1,0),
-       pysam.CINS:       (1,0,1),
-       pysam.CDEL:       (0,1,1),
-       pysam.CREF_SKIP:  (0,1,0),
-       pysam.CSOFT_CLIP: (1,0,1),
-       pysam.CHARD_CLIP: (0,0,0),
-       pysam.CPAD:       (0,0,0)}
-#      pysam.CBACK:      (0,0,0)}
+OPTAB={
+    pysam.CMATCH:     (1,1,0),
+    pysam.CEQUAL:     (1,1,0),
+    pysam.CDIFF:      (1,1,0),
+    pysam.CINS:       (1,0,1),
+    pysam.CDEL:       (0,1,1),
+    pysam.CREF_SKIP:  (0,1,0),
+    pysam.CSOFT_CLIP: (1,0,1),
+    pysam.CHARD_CLIP: (0,0,0),
+    pysam.CPAD:       (0,0,0),
+#   pysam.CBACK:      (0,0,0)
+}
 
+# 按照cigar的index，赋值
 OPLIST=[(0,0,0) for i in range(max(int(k) for k in OPTAB.keys())+1)]
 for k,v in OPTAB.items():
     OPLIST[int(k)]=v
 
 def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
     """
-    从read的cigar操作中提取ins，del，soft_clip，生成lead。
+    从read的cigar操作中提取ins, del, soft_clip, 生成lead。
     """
     minsvlen=config.minsvlen_screen
-    longinslen=config.long_ins_length/2.0
-    seq_cache_maxlen=config.dev_seq_cache_maxlen
+    longinslen=config.long_ins_length/2.0 # 2500 / 2
+    seq_cache_maxlen=config.dev_seq_cache_maxlen # 50000
     qname=read.query_name
     mapq=read.mapping_quality
     strand="-" if read.is_reverse else "+"
@@ -172,7 +175,7 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
     for op,oplength in read.cigartuples:
         add_read,add_ref,event=OPLIST[op]
         if event and oplength >= minsvlen:
-            # 应该记录的lead
+            # 应该记录的event
             if op==CINS:
                 yield Lead(read_id,
                            qname,
@@ -192,7 +195,7 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
                 yield Lead(read_id,
                            qname,
                            contig,
-                           pos_ref+oplength,
+                           pos_ref+oplength, # ref_start > ref_end ?
                            pos_ref,
                            pos_read,
                            pos_read,
@@ -203,7 +206,7 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
                            "DEL",
                            -oplength)
             elif use_clips and op==CSOFT_CLIP and oplength >= longinslen:
-                # long ins
+                # large ins
                 yield Lead(read_id,
                            qname,
                            contig,
@@ -459,8 +462,8 @@ class LeadProvider:
     def __init__(self,config,read_id_offset):
         self.config=config
 
-        self.leadtab={} # 以sv类型为key，存储线索
-        self.leadcounts={} # 以sv类型为key
+        self.leadtab={} # 以sv类型为key，存储lead列表
+        self.leadcounts={} # 以sv类型为key，存储lead数目
 
         for svtype in sv.TYPES:
             self.leadtab[svtype]={} # 以pos为key -> 存储lead列表
@@ -501,7 +504,7 @@ class LeadProvider:
         """
         if self.config.dev_cache:
             # 存在缓存，则载入缓存中的leads
-            loaded_externals=self.dev_load_leadtab(contig,start,end) # 此方法似乎尚未实现？
+            loaded_externals=self.dev_load_leadtab(contig,start,end) # 此方法尚未实现
             if loaded_externals!=False:
                 return loaded_externals
 
@@ -541,8 +544,8 @@ class LeadProvider:
         leads_all=[]
         binsize=self.config.cluster_binsize
         coverage_binsize=self.config.coverage_binsize
-        coverage_shift_bins=self.config.coverage_shift_bins
-        coverage_shift_min_aln_len=self.config.coverage_shift_bins_min_aln_length
+        coverage_shift_bins=self.config.coverage_shift_bins # 3
+        coverage_shift_min_aln_len=self.config.coverage_shift_bins_min_aln_length # 1000
         long_ins_threshold=self.config.long_ins_length*0.5 # 2500 * 0.5
         qc_nm=self.config.qc_nm
         phase=self.config.phase
@@ -555,8 +558,10 @@ class LeadProvider:
             #if self.read_count % 1000000 == 0:
             #    gc.collect()
             if read.reference_start < start or read.reference_start >= end:
+                # read不在目标区域
                 continue
-
+            
+            # read在目标区域
             self.read_id+=1
             self.read_count+=1
 
@@ -564,6 +569,7 @@ class LeadProvider:
 
             # 过滤reads
             if read.mapping_quality < mapq_min or read.is_secondary or alen < alen_min:
+                # mapping quality < 25, secondary, query_alignment_length < 1000 bp
                 continue
 
             has_sa=read.has_tag("SA") # supplementary alignment？
@@ -571,6 +577,8 @@ class LeadProvider:
 
             nm=-1
             curr_read_id=self.read_id
+
+            # qc_nm or phase.
             if advanced_tags:
                 if qc_nm:
                     if read.has_tag("NM"): # NM tag？
@@ -586,6 +594,7 @@ class LeadProvider:
                 yield lead
 
             #Extract read splits
+            # read具有SA标签
             if has_sa:
                 if read.is_supplementary:
                     # sup比对
@@ -605,6 +614,8 @@ class LeadProvider:
                 target_tab=self.covrtab_rev
             else:
                 target_tab=self.covrtab_fwd
+            
+            # 计算覆盖度起止的bin坐标。这里根据query_alignment_length的阈值对起止坐标进行了移动
             covr_start_bin=(int(read.reference_start/coverage_binsize)+coverage_shift_bins*(alen>=coverage_shift_min_aln_len))*coverage_binsize
             covr_end_bin=(int(read_end/coverage_binsize)-coverage_shift_bins*(alen>=coverage_shift_min_aln_len))*coverage_binsize
 

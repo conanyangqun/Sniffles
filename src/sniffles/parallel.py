@@ -221,6 +221,7 @@ def Main_Internal(proc_id,config,pipe):
         command,arg=pipe.recv() # 从管道接收命令和task对象
 
         if command=="call_sample":
+            # call_sample模式
             task=arg
             result={}
 
@@ -371,4 +372,5 @@ def Main_Internal(proc_id,config,pipe):
             gc.collect()
 
         elif command=="finalize":
+            # finalize模式，进程退出
             return
