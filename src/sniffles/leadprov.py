@@ -69,6 +69,7 @@ def CIGAR_analyze(cigar):
                 else:
                     raise f"Unknown CIGAR operation: '{c}'"
             buf=""
+    
     if clip_start==None:
         clip_start=clip
     return clip_start, clip-clip_start, refspan, readspan
@@ -265,10 +266,10 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
     minpos_curr_chr=min(itertools.chain([read.reference_start],(int(pos) for refname,pos,strand,cigar,mapq,nm in supps if refname==contig)))
     if minpos_curr_chr < read.reference_start:
         #Only process splits once per chr (there may be multiple supplementary alignments on the same chr)
-        # 如果染色体上存在多个SA，则只处理比对位置最前的一个
+        # 某条read在同一条染色体上有多个SA比对，只处理位置最靠前的一个。当前一个并非最靠前
         return
 
-    # 同一染色上的多个SA比对，或者不同染色体上的SA比对
+    # 同一染色上的多个SA比对，此为最考前的比对或者不同染色体上的SA比对
     for refname,pos,strand,cigar,mapq,nm in supps:
         mapq=int(mapq)
         nm=int(nm)
@@ -332,6 +333,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
     supps=[part.split(",") for part in read.get_tag("SA").split(";") if len(part)>0]
 
     if len(supps) > config.max_splits_base + config.max_splits_kb*(read.query_length/1000.0):
+        # read sup比对数目超过阈值
         return
 
     #QC on: 18Aug21, HG002.ont.chr22; O.K.
@@ -417,6 +419,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
         for svtype, svstart, arg in lead.svtypes_starts_lens:
             min_mapq=min(lead.mapq,all_leads[max(0,lead_i-1)].mapq)
             if not config.dev_keep_lowqual_splits and min_mapq < config.mapq:
+                # 过滤低MQ的lead
                 continue
 
             if svtype=="BND":

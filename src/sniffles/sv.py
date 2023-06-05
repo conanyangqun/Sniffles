@@ -408,6 +408,7 @@ def classify_splits(read,leads,config,main_contig):
                     and (curr.ref_start - last.ref_end) < maxsvlen_other
                     and (curr.qry_start - last.qry_end) - (curr.ref_start - last.ref_end) >= minsvlen_screen):
                     #INS, FWD
+                    # 正链INS
                     svstart=curr.ref_start
                     svlen=(curr.qry_start - last.qry_end)
                     if svlen <= config.dev_seq_cache_maxlen:
@@ -420,6 +421,7 @@ def classify_splits(read,leads,config,main_contig):
                       and (last.ref_start - curr.ref_end) < maxsvlen_other
                       and (curr.qry_start - last.qry_end) - (last.ref_start - curr.ref_end) >= minsvlen_screen):
                     #INS, REV
+                    # 负链INS
                     svstart=last.ref_start
                     svlen=(curr.qry_start - last.qry_end)
                     if svlen <= config.dev_seq_cache_maxlen:
@@ -432,6 +434,7 @@ def classify_splits(read,leads,config,main_contig):
                       and qry_dist_abs < maxsvlen_other
                       and (curr.ref_start - last.ref_end) - (curr.qry_start - last.qry_end) >= minsvlen_screen):
                         #DEL, FWD
+                        # 正链DEL
                         svstart=curr.ref_start
                         svlen=(curr.ref_start - last.ref_end)
                         curr.svtypes_starts_lens.append(("DEL",svstart,-svlen))
@@ -440,6 +443,7 @@ def classify_splits(read,leads,config,main_contig):
                       and qry_dist_abs < maxsvlen_other
                       and (last.ref_start - curr.ref_end) - (curr.qry_start - last.qry_end) >= minsvlen_screen):
                         #DEL, REV
+                        # 负链DEL
                         svstart=last.ref_start
                         svlen=(last.ref_start - curr.ref_end)
                         curr.svtypes_starts_lens.append(("DEL",svstart,-svlen))
@@ -447,6 +451,7 @@ def classify_splits(read,leads,config,main_contig):
                 elif fwd and curr.ref_start <= last.ref_end:
                     if qry_dist_abs < maxsvlen_other:
                         #DUP, FWD
+                        # 正链DUP
                         svstart=curr.ref_start
                         svlen=(last.ref_end - curr.ref_start)
                         if svlen >= minsvlen_screen:
@@ -455,6 +460,7 @@ def classify_splits(read,leads,config,main_contig):
                 elif rev and last.ref_start <= curr.ref_end:
                     if qry_dist_abs < maxsvlen_other:
                         #DUP, REV
+                        # 负链DUP
                         svstart=last.ref_start
                         svlen=(curr.ref_end - last.ref_start)
                         if svlen >= minsvlen_screen:
@@ -464,6 +470,7 @@ def classify_splits(read,leads,config,main_contig):
                 #
                 #INV
                 #
+                # 两个lead链不同，即倒位
                 if fwd and curr.ref_start <= last.ref_start:
                     #CASE B
                     svstart=curr.ref_start
@@ -496,6 +503,7 @@ def classify_splits(read,leads,config,main_contig):
             #
             #BND
             #
+            # 不同染色体，BND类型
             if curr.contig == main_contig:
                 a,b=curr,last
             else:
