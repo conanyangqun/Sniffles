@@ -379,7 +379,7 @@ def classify_splits(read,leads,config,main_contig):
     对从SA中获取的各个leads，分析其SV类型。
     """
     minsvlen_screen=config.minsvlen_screen # 35bp * 0.9
-    maxsvlen_other=minsvlen_screen*5
+    maxsvlen_other=minsvlen_screen*5 # 35bp * 0.9 * 5
 
     leads.sort(key=lambda ld: ld.qry_start)
     last=leads[0]

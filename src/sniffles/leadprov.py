@@ -326,7 +326,7 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
 
 def read_itersplits(read_id,read,contig,config,read_nm):
     """
-    从primary比对中提取leads，判断sv的类型。生成BND、INS等不同类型的SV。
+    从带SA的primary比对中提取leads，判断sv的类型。生成BND、INS等不同类型的SV。
     """
     #SA:refname,pos,strand,CIGAR,MAPQ,NM
     all_leads=[]
@@ -365,7 +365,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
                    "-" if read.is_reverse else "+",
                    read.mapping_quality,
                    read_nm,
-                   "SPLIT_PRIM",
+                   "SPLIT_PRIM", # split比对的primary比对
                    "?")
     all_leads.append(curr_lead)
 
@@ -402,7 +402,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
                               strand,
                               mapq,
                               nm/float(readspan+1),
-                              "SPLIT_SUP",
+                              "SPLIT_SUP", # split-reads后的sup比对
                               "?"))
 
         #QC on: 08Sep21; O.K.
