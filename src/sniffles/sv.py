@@ -471,6 +471,7 @@ def classify_splits(read,leads,config,main_contig):
                 #INV
                 #
                 # 两个lead链不同，即倒位
+                # 这里结合示意图可以方便的理解
                 if fwd and curr.ref_start <= last.ref_start:
                     #CASE B
                     svstart=curr.ref_start

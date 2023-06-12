@@ -260,7 +260,7 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
     prim_refname,prim_pos,prim_strand,prim_cigar,prim_mapq,prim_nm=supps[0]
     if prim_refname == contig:
         #Primary alignment is on this chromosome, no need to parse the supplementary
-        # primary比对和supplementary比对在同一条染色体上
+        # primary比对在当前染色体上，则无须解析
         return
 
     minpos_curr_chr=min(itertools.chain([read.reference_start],(int(pos) for refname,pos,strand,cigar,mapq,nm in supps if refname==contig)))
@@ -269,7 +269,7 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
         # 某条read在同一条染色体上有多个SA比对，只处理位置最靠前的一个。当前一个并非最靠前
         return
 
-    # 同一染色上的多个SA比对，此为最考前的比对或者不同染色体上的SA比对
+    # 同一染色上的多个SA比对，此为最靠前的比对
     for refname,pos,strand,cigar,mapq,nm in supps:
         mapq=int(mapq)
         nm=int(nm)
@@ -417,7 +417,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
 
     for lead_i, lead in enumerate(all_leads):
         for svtype, svstart, arg in lead.svtypes_starts_lens:
-            min_mapq=min(lead.mapq,all_leads[max(0,lead_i-1)].mapq)
+            min_mapq=min(lead.mapq,all_leads[max(0,lead_i-1)].mapq) # 这里要用1和2的最小的mapq？
             if not config.dev_keep_lowqual_splits and min_mapq < config.mapq:
                 # 过滤低MQ的lead
                 continue
@@ -441,6 +441,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
                 yield bnd
 
             elif svtype!="NOSV":
+                # 其他类型的SV
                 svlen=arg
 
                 yield Lead(read_id=lead.read_id,
@@ -465,7 +466,7 @@ class LeadProvider:
     def __init__(self,config,read_id_offset):
         self.config=config
 
-        self.leadtab={} # 以sv类型为key，存储lead列表
+        self.leadtab={} # 以sv类型为key，存储lead字典，即svtype -> pos -> [lead]
         self.leadcounts={} # 以sv类型为key，存储lead数目
 
         for svtype in sv.TYPES:
@@ -494,7 +495,7 @@ class LeadProvider:
             leadtab_svtype[pos_leadtab].append(ld)
             lead_count=len(leadtab_svtype[pos_leadtab])
             if lead_count > self.config.consensus_max_reads_bin:
-                # 默认10条reads
+                # 默认只存储10条lead的序列
                 ld.seq=None
         else:
             leadtab_svtype[pos_leadtab]=[ld]
@@ -504,6 +505,7 @@ class LeadProvider:
     def build_leadtab(self,contig,start,end,bam):
         """
         根据contig:start-end获取leads。如果lead位于当前区域，保存到相应的leadtab中。否则，存储到external中返回。
+        返回区域外的leads，按照sv类型分bin存储区域内的lead，并按照bin统计覆盖度。
         """
         if self.config.dev_cache:
             # 存在缓存，则载入缓存中的leads
@@ -627,6 +629,7 @@ class LeadProvider:
                 target_tab[covr_start_bin]=target_tab[covr_start_bin]+1 if covr_start_bin in target_tab else 1
 
                 if read_end <= self.end:
+                    # read完全包含在区域内
                     target_tab[covr_end_bin]=target_tab[covr_end_bin]-1 if covr_end_bin in target_tab else -1
 
 
