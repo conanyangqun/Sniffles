@@ -200,7 +200,7 @@ def resolve(svtype,leadtab_provider,config,tr):
     根据一系列条件，拆分cluster。
     """
     leadtab=leadtab_provider.leadtab[svtype]
-    seeds=sorted(leadtab_provider.leadtab[svtype])
+    seeds=sorted(leadtab_provider.leadtab[svtype]) # bin -> []
 
     if len(seeds)==0:
         # 此区域没有lead，空{}
@@ -223,7 +223,7 @@ def resolve(svtype,leadtab_provider,config,tr):
                 continue
         
         # 判断seed（lead所在的起始位置）是否位于tr中
-        # 此处的代码似乎存在问题。就是只有第一个seed的tr判断有效。之后的seed，不再进习惯tr的判断？
+        # 此处的代码似乎存在问题。seed只进行最后一个tr的判断？
         within_tr=False
         if tr!=None and tr_index < len(tr):
             while tr_end < seed and tr_index+1 < len(tr):
