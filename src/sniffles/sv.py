@@ -127,7 +127,7 @@ def call_from(cluster,config,keep_qc_fails,task):
         support=len(set(k.read_qname for k in leads))
         support_long=0
     
-    ref_start=util.center(v.ref_start for v in leads)
+    ref_start=util.center(v.ref_start for v in leads) # 出现次数最多的前2个pos对应的ref pos的中值
     stdev_pos=util.stdev(util.trim((v.ref_start for v in leads))) # 获取1/4-3/4之间的位置，计算位置的std
 
     # 根据sv长度、pos的sd，判断是否精确
