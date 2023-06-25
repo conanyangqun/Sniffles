@@ -65,6 +65,7 @@ class SVCall:
     coverage_end: int = None
 
     def set_info(self,k,v):
+        # 存储额外的SV属性
         self.info[k]=v
 
     def get_info(self,k):

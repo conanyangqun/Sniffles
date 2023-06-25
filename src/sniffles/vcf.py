@@ -23,6 +23,9 @@ def format_info(k,v):
         return f"{k}={v}"
 
 def format_genotype(gt):
+    """
+    根据基因型信息列表返回基因型字符串
+    """
     if len(gt)==6:
         a,b,qual,dr,dv,ps=gt
         if ps!=None and (a,b)==(0,1):
@@ -213,6 +216,7 @@ class VCF:
 
         #Resolve DEL sequence
         if not self.config.symbolic and call.svtype=="DEL" and self.reference_handle != None and abs(call.svlen) <= self.config.max_del_seq_len:
+            # del类型，但是不属于大del类型，从ref获取序列
             try:
                 call.ref=self.reference_handle.fetch(call.contig,call.pos,call.pos-call.svlen)
                 call.alt="N"
