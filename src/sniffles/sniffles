@@ -20,7 +20,6 @@ import collections
 import math
 import time
 import os
-from pathlib import Path
 import json
 
 import pysam
@@ -86,7 +85,7 @@ def Sniffles2_Main(config,processes):
 
     # 判断参数的合理性
     if config.mode != "call_sample" and config.snf != None:
-        util.fatal_error_main(f"--snf cannot be used with run mode {mode}")
+        util.fatal_error_main(f"--snf cannot be used with run mode {config.mode}")
 
     if config.vcf == None and config.snf == None:
         util.fatal_error_main("Please specify at least one of: --vcf or --snf for output (both may be used at the same time)")
@@ -197,8 +196,6 @@ def Sniffles2_Main(config,processes):
         if os.path.exists(config.vcf) and not config.allow_overwrite:
             util.fatal_error_main(f"Output file '{config.vcf}' already exists! Use --allow-overwrite to ignore this check and overwrite.")
         else:
-            if not Path(config.vcf).parent.exists():
-                Path(config.vcf).parent.mkdir(parents=True)
             if config.vcf_output_bgz:
                 # bgzip and sort.
                 if not config.sort:
@@ -370,7 +367,7 @@ def Sniffles2_Main(config,processes):
             
             config.snf_input_info.append({"internal_id":snf_internal_id, "sample_id": sample_id, "filename": input_filename})
             snf_internal_id+=1
-            snf_in.handle.close()
+            snf_in.close()
 
         # 设置vcf中的样本id
         if not config.combine_consensus:
