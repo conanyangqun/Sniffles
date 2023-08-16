@@ -226,6 +226,9 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
         pos_ref+=add_ref*oplength
 
 def get_cigar_indels(read_id,read,contig,config,use_clips,read_nm):
+    """
+    计算ins和del的长度
+    """
     minsvlen=config.minsvlen_screen
     longinslen=config.long_ins_length/2.0
     seq_cache_maxlen=config.dev_seq_cache_maxlen
