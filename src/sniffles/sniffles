@@ -240,6 +240,7 @@ def Sniffles2_Main(config,processes):
         total_mapped=bam_in.mapped # 比对的reads总数
 
         # 设置每个task最多处理的reads数
+        # 对于bam，为总reads数目。对于cram，为0.
         if (config.threads==1 and not config.low_memory) or config.task_count_multiplier==0:
             # config.py中设置了task_count_multiplier = 0，因此总是执行此条件
             task_max_reads=total_mapped
@@ -259,6 +260,7 @@ def Sniffles2_Main(config,processes):
         contigs_with_tr_annotations=0 # 统计具有tr注释的contig数目
         # 根据reads数目计算任务数目
         for contig in bam_in.get_index_statistics():
+            # task_count的数目始终为1。即一条chrom一个task
             if task_max_reads==0:
                 # cram，一条染色体一个task。
                 task_count=1
@@ -313,6 +315,7 @@ def Sniffles2_Main(config,processes):
         #
         # Process .snf headers
         #
+        # combine模式
         config.snf_input_info=[] # 以{internal_id, sample_id, filename}字典存储snf文件名和元信息
         total_mapped=0
         snf_internal_id=0 # snf内部id编号
