@@ -229,7 +229,7 @@ def from_cmdline():
         config.minsupport_auto_mult=0.1
 
     config.coverage_binsize=config.cluster_binsize
-    config.coverage_binsize_combine=config.cluster_binsize*config.cluster_binsize_combine_mult
+    config.coverage_binsize_combine=config.cluster_binsize*config.cluster_binsize_combine_mult # cluster_binsize * 5
 
 
     #INS Consensus parameters

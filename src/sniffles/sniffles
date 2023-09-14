@@ -79,6 +79,7 @@ def Sniffles2_Main(config,processes):
             config.input_is_cram=True
 
     elif "snf" in input_ext or "tsv" in input_ext:
+        # combine模式
         config.mode="combine"
     else:
         util.fatal_error_main(f"Failed to determine run mode from input. Please specify either: A single .bam file - OR - one or more .snf files - OR - a single .tsv file containing a list of .snf files and optional sample ids as input. (supplied were: {list(set(input_ext))})")
