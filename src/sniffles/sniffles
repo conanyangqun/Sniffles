@@ -489,6 +489,7 @@ def Sniffles2_Main(config,processes):
             assert(task.assigned_process_id==None) # 确保task没有被进程运行过
             task.assigned_process_id=proc.id
             proc.pipe_main.send([config.mode,task]) # 通过管道把运行模式、task传递给子进程
+            # 此时主进程和子进行并行执行
 
         if total_mapped > 0:
             #Progress disabled for CRAM files due to total read count not being stored in index
@@ -501,7 +502,7 @@ def Sniffles2_Main(config,processes):
         if len(processes_busy) > 0:
             # 存在运行中的任务
             for proc in processes_busy:
-                if proc.pipe_main.poll(0.01)==True: # 管道存在需要读取的数据
+                if proc.pipe_main.poll(0.01)==True: # 管道存在需要读取的数据，在这里读取子进程的数据
                     #Process has finished building leadtab, receive and distribute leads that need to be synced
                     command,result=proc.pipe_main.recv()
                     if command=="worker_exception":
