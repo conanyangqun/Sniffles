@@ -160,7 +160,7 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
     """
     从read的cigar操作中提取ins, del, soft_clip, 生成lead。
     """
-    minsvlen=config.minsvlen_screen
+    minsvlen=config.minsvlen_screen # 35bp * 0.9
     longinslen=config.long_ins_length/2.0 # 2500 / 2
     seq_cache_maxlen=config.dev_seq_cache_maxlen # 50000
     qname=read.query_name
@@ -176,7 +176,7 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
     for op,oplength in read.cigartuples:
         add_read,add_ref,event=OPLIST[op]
         if event and oplength >= minsvlen:
-            # 应该记录的event
+            # 应该记录的event, INS/DEL/SOFT_CLIP.
             if op==CINS:
                 yield Lead(read_id,
                            qname,
@@ -205,7 +205,7 @@ def read_iterindels(read_id,read,contig,config,use_clips,read_nm):
                            read_nm,
                            "INLINE",
                            "DEL",
-                           -oplength)
+                           -oplength) # svlen = -x.
             elif use_clips and op==CSOFT_CLIP and oplength >= longinslen:
                 # large ins
                 yield Lead(read_id,
@@ -581,6 +581,7 @@ class LeadProvider:
 
         # 迭代每个lead
         for ld in self.iter_region(bam,contig,start,end):
+            # 从read内部的INS、DEL、SOFT_CLIP获取lead.
             ld_contig,ld_ref_start=ld.contig,ld.ref_start
 
             if contig==ld_contig and ld_ref_start >= start and ld_ref_start < end:
@@ -601,19 +602,19 @@ class LeadProvider:
         生成器函数。
         """
         leads_all=[]
-        binsize=self.config.cluster_binsize
-        coverage_binsize=self.config.coverage_binsize
+        binsize=self.config.cluster_binsize # 100 bp.
+        coverage_binsize=self.config.coverage_binsize # 100 bp.
         coverage_shift_bins=self.config.coverage_shift_bins # 3
         coverage_shift_min_aln_len=self.config.coverage_shift_bins_min_aln_length # 1000
         long_ins_threshold=self.config.long_ins_length*0.5 # 2500 * 0.5
-        qc_nm=self.config.qc_nm_measure
-        phase=self.config.phase
+        qc_nm=self.config.qc_nm_measure # false.
+        phase=self.config.phase # false.
         advanced_tags=qc_nm or phase
         mapq_min=self.config.mapq # 比对质量, 25
         alen_min=self.config.min_alignment_length # 最短比对长度, 1kb
-        nm_sum=0
+        nm_sum=0 # 所有read校正后的NM
         nm_count=0
-        trace_read=self.config.dev_trace_read
+        trace_read=self.config.dev_trace_read # false.
 
         # 迭代contig:start-end区域的每条read
         for read in bam.fetch(contig,start,end,until_eof=False):
@@ -647,7 +648,8 @@ class LeadProvider:
             # qc_nm or phase.
             if advanced_tags:
                 if qc_nm:
-                    if read.has_tag("NM"): # NM tag？
+                    if read.has_tag("NM"): # NM tag
+                        # 校正NM
                         nm_raw=read.get_tag("NM")
                         nm_ratio=read.get_tag("NM")/float(read.query_alignment_length+1)
                         ins_sum,del_sum=get_cigar_indels(curr_read_id,read,contig,self.config,use_clips,read_nm=nm)
