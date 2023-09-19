@@ -451,7 +451,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
     if trace_read:
         print(f"[DEV_TRACE_READ] [0c/4] [LeadProvider.read_itersplits] [{read.query_name}] all_leads: {all_leads}")
 
-    sv.classify_splits(read,all_leads,config,contig)
+    sv.classify_splits(read,all_leads,config,contig) # 根据primary和SA比对片段，解析所有的SV
 
     if trace_read:
         print(f"[DEV_TRACE_READ] [0c/4] [LeadProvider.read_itersplits] [{read.query_name}] classify_splits(all_leads): {all_leads}")
@@ -472,7 +472,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
 
     for lead_i, lead in enumerate(all_leads):
         for svtype, svstart, arg in lead.svtypes_starts_lens:
-            min_mapq=min(lead.mapq,all_leads[max(0,lead_i-1)].mapq) # 这里要用1和2的最小的mapq？
+            min_mapq=min(lead.mapq,all_leads[max(0,lead_i-1)].mapq) # 每个lead与前一个lead的mapq最小值
             if not config.dev_keep_lowqual_splits and min_mapq < config.mapq:
                 # 过滤低MQ的lead
                 continue

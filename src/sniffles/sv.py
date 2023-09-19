@@ -415,7 +415,7 @@ def classify_splits(read,leads,config,main_contig):
                 #INS, DEL, DUP
                 #
                 if (fwd and (curr.qry_start - last.qry_end) >= minsvlen_screen
-                    and (curr.ref_start - last.ref_end) < maxsvlen_other
+                    and (curr.ref_start - last.ref_end) < maxsvlen_other 
                     and (curr.qry_start - last.qry_end) - (curr.ref_start - last.ref_end) >= minsvlen_screen):
                     #INS, FWD
                     # 正链INS
