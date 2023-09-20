@@ -331,7 +331,7 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
                               "SPLIT_SUP",
                               "?"))
 
-    sv.classify_splits(read,all_leads,config,contig) # 根据每个lead，判断SV的类型
+    sv.classify_splits(read,all_leads,config,contig) # 根据SA比对的所有lead，判断SV的类型
 
     # 从SA比对中只提取BND类型
     for lead in all_leads:
@@ -365,7 +365,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
     trace_read=config.dev_trace_read!=False and config.dev_trace_read==read.query_name
 
     if len(supps) > config.max_splits_base + config.max_splits_kb*(read.query_length/1000.0):
-        # read sup比对数目超过阈值
+        # read sup比对数目超过阈值, 3 + 0.1 * (query / 1000)
         return
 
     if trace_read:
