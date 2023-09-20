@@ -386,7 +386,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
     #End QC
 
     if read.is_reverse:
-        qry_start=read.query_length-read.query_alignment_end
+        qry_start=read.query_length-read.query_alignment_end # 按照read来确定方向
     else:
         qry_start=read.query_alignment_start
 
