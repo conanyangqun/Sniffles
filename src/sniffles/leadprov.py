@@ -419,7 +419,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
         is_rev=(strand=="-")
 
         try:
-            readstart_fwd,readstart_rev,refspan,readspan=CIGAR_analyze(cigar)
+            readstart_fwd,readstart_rev,refspan,readspan=CIGAR_analyze(cigar) # 用来根据cigar计算比对在read上的位置
         except Exception as e:
             util.error(f"Malformed CIGAR '{cigar}' with pos {pos} of read '{read.query_name}' ({e}). Skipping.")
             return
