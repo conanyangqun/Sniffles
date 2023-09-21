@@ -388,14 +388,14 @@ def classify_splits(read,leads,config,main_contig):
     对从SA中获取的各个leads，分析其SV类型。
     """
     minsvlen_screen=config.minsvlen_screen # 35bp * 0.9
-    maxsvlen_other=minsvlen_screen*config.dev_split_max_query_distance_mult
+    maxsvlen_other=minsvlen_screen*config.dev_split_max_query_distance_mult # 35 * 0.9 * 5
     min_split_len_bnd=config.bnd_min_split_length # 35bp * 0.9 * 5
 
     leads.sort(key=lambda ld: ld.qry_start)
     last=leads[0]
     last.svtypes_starts_lens=[]
 
-    # read的主比对长度超过1/2 long ins，则看做INS sv。
+    # 第一个比对在read上的位置超过long_ins阈值，表示之前为S/H的碱基
     if last.qry_start >= config.long_ins_length*0.5:
         last.svtypes_starts_lens.append(("INS",last.ref_start,None))
 
@@ -403,7 +403,7 @@ def classify_splits(read,leads,config,main_contig):
     for i in range(1,len(leads)):
         curr=leads[i]
         curr.svtypes_starts_lens=[]
-        qry_dist_abs=abs(curr.qry_start - last.qry_end) # 与第一个lead的距离
+        qry_dist_abs=abs(curr.qry_start - last.qry_end) # 当前比对片段（lead）与前一个比对片段在read上的距离
 
         if curr.contig == last.contig:
             # 两个lead位于同一条染色体上
