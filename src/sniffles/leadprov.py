@@ -291,16 +291,18 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
     prim_refname,prim_pos,prim_strand,prim_cigar,prim_mapq,prim_nm=supps[0]
     if prim_refname == contig:
         #Primary alignment is on this chromosome, no need to parse the supplementary
-        # primary比对在当前染色体上，则无须解析
+        # primary比对在当前染色体上，则无须解析.
+        # 即，read的sup比对到了目标区域，primary比对在另外的染色体上
         return
 
     minpos_curr_chr=min(itertools.chain([read.reference_start],(int(pos) for refname,pos,strand,cigar,mapq,nm in supps if refname==contig)))
     if minpos_curr_chr < read.reference_start:
         #Only process splits once per chr (there may be multiple supplementary alignments on the same chr)
-        # 某条read在同一条染色体上有多个SA比对，只处理位置最靠前的一个。当前一个并非最靠前
+        # 只处理在每条染色体上split 1次的read，即read在同一条染色体上可能存在多个split
+        # 报证read的主比对是最靠前的比对
         return
 
-    # 同一染色上的多个SA比对，此为最靠前的比对
+    # 迭代每个sup比对
     for refname,pos,strand,cigar,mapq,nm in supps:
         mapq=int(mapq)
         nm=int(nm)
