@@ -258,7 +258,7 @@ def get_cigar_indels(read_id,read,contig,config,use_clips,read_nm):
 
 def read_itersplits_bnd(read_id,read,contig,config,read_nm):
     """
-    从sup比对提取lead。
+    从sup比对中提取BND类型的lead
     """
     assert(read.is_supplementary)
     #SA:refname,pos,strand,CIGAR,MAPQ,NM
@@ -298,8 +298,7 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
     minpos_curr_chr=min(itertools.chain([read.reference_start],(int(pos) for refname,pos,strand,cigar,mapq,nm in supps if refname==contig)))
     if minpos_curr_chr < read.reference_start:
         #Only process splits once per chr (there may be multiple supplementary alignments on the same chr)
-        # 只处理在每条染色体上split 1次的read，即read在同一条染色体上可能存在多个split
-        # 报证read的主比对是最靠前的比对
+        # 如果read在当前染色体存在多个sup比对结果，则只处理第一个sup。
         return
 
     # 迭代每个sup比对
@@ -724,6 +723,7 @@ class LeadProvider:
                     # read完全包含在区域内
                     target_tab[covr_end_bin]=target_tab[covr_end_bin]-1 if covr_end_bin in target_tab else -1
 
+        # 计算当前区域的平均NM，作为阈值
         self.config.average_regional_nm=nm_sum/float(max(1,nm_count))
         self.config.qc_nm_threshold=self.config.average_regional_nm
         #print(f"Contig {contig} avg. regional NM={self.config.average_regional_nm}, threshold={self.config.qc_nm_threshold}")
