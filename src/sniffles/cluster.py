@@ -220,11 +220,12 @@ def resolve(svtype,leadtab_provider,config,tr):
     clusters=[]
     for seed_index,seed in enumerate(seeds):
         if config.dev_call_region != None:
+            # 开发者选项，检出某个特定的区域内的变异
             if seed<config.dev_call_region["start"] or seed>config.dev_call_region["end"]:
                 continue
         
         # 判断seed（lead所在的起始位置）是否位于tr中
-        # 此处的代码似乎存在问题。seed只进行最后一个tr的判断？
+        # 当某个seed处于某个tr中，则下一个seed肯定不会在之前的tr中。
         within_tr=False
         if tr!=None and tr_index < len(tr):
             while tr_end < seed and tr_index+1 < len(tr):
@@ -251,7 +252,7 @@ def resolve(svtype,leadtab_provider,config,tr):
                         repeat=within_tr or config.repeat,
                         leads_long=leads_long)
 
-        cluster.compute_metrics()
+        cluster.compute_metrics() # 计算sv长度均值和ref_start标准差
         clusters.append(cluster)
 
 
