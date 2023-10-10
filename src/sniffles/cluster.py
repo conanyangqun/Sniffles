@@ -53,8 +53,7 @@ class Cluster:
 
 def merge_inner(cluster,threshold):
     """
-    对来自于同一条read的lead进行合并。
-    根据read来源对cluster的所有leads进行分组，迭代每条read上的每个lead，判断是否合并lead。返回合并了同一个read上lead的cluster
+    对来自于同一条read上的lead进行合并.
     """
     read_seq={} # 以read_qname为key，存储所有lead.
     for ld in cluster.leads:
@@ -141,13 +140,12 @@ def resplit_bnd(cluster,merge_threshold):
     contigs_leads={} # 以contig -> {bin -> [lead]}形式存储
 
     #Split by mate contig and mate ref start
-    # 对于BND类型，获取每个lead的mate信息，根据mate信息分组lead。
+    # 对于BND类型，根据mate conrig和ref start，按照1kb窗口存储lead
     for lead in cluster.leads:
         if not lead.bnd_info.mate_contig in contigs_leads:
             contigs_leads[lead.bnd_info.mate_contig]={}
 
-        bin=int(lead.bnd_info.mate_ref_start/merge_threshold)*merge_threshold if merge_threshold>0 else 0 # 可以理解为bin
-        # 注意，所有的leads位于相同的bin中
+        bin=int(lead.bnd_info.mate_ref_start/merge_threshold)*merge_threshold if merge_threshold>0 else 0 # 1kb的窗口
         if not bin in contigs_leads[lead.bnd_info.mate_contig]:
             contigs_leads[lead.bnd_info.mate_contig][bin]=[lead]
         else:
@@ -158,7 +156,7 @@ def resplit_bnd(cluster,merge_threshold):
         bins=sorted(contigs_leads[contig])
         curr_leads=[]+contigs_leads[contig][bins[0]]
         last_bin=bins[0]
-        # 迭代每个窗口
+        # 迭代每个窗口，如果有lead的两个窗口在1kb以内，则合并两个bin
         for bin in bins[1:]:
             if bin - last_bin <= merge_threshold:
                 # 小于阈值，合并两个相邻的bin
@@ -172,14 +170,14 @@ def resplit_bnd(cluster,merge_threshold):
                                         start=cluster.start,
                                         end=cluster.end,
                                         seed=cluster.seed,
-                                        leads=[k for k in curr_leads],
+                                        leads=[k for k in curr_leads], # leads发生变化
                                         repeat=cluster.repeat,
                                         leads_long=None)
                     yield new_cluster
                 curr_leads=[]+contigs_leads[contig][bin]
             last_bin=bin
         
-        # 处理最后残留的leads
+        # 处理最后残留的1个bin
         if len(curr_leads):
             new_cluster=Cluster(id=cluster.id+f".CHR2.{contig}.POS2.{bin}",
                                 svtype=cluster.svtype,
@@ -199,9 +197,10 @@ def resolve(svtype,leadtab_provider,config,tr):
     根据每种sv的leadtab，迭代每个bin，构建cluster。
     根据一系列条件，合并cluster。
     根据一系列条件，拆分cluster。
+    返回cluster
     """
-    leadtab=leadtab_provider.leadtab[svtype]
-    seeds=sorted(leadtab_provider.leadtab[svtype]) # bin -> []
+    leadtab=leadtab_provider.leadtab[svtype] # bin_pos -> [lead01, lead02...]
+    seeds=sorted(leadtab_provider.leadtab[svtype])
 
     if len(seeds)==0:
         # 此区域没有lead，空{}
@@ -278,7 +277,7 @@ def resolve(svtype,leadtab_provider,config,tr):
         merge = merge or ( (config.repeat or curr_cluster.repeat or next_cluster.repeat) and outer_dist <= min(config.cluster_repeat_h_max, (abs(curr_cluster.mean_svlen)+abs(next_cluster.mean_svlen)) * config.cluster_repeat_h) )
         merge = merge or (svtype=="BND" and inner_dist <= config.cluster_merge_bnd)
 
-        # 合并sv的具体代码
+        # 合并cluster.
         if merge:
             clusters.pop(i+1)
             curr_cluster.leads+=next_cluster.leads
@@ -296,8 +295,8 @@ def resolve(svtype,leadtab_provider,config,tr):
                 if ld.read_qname==config.dev_trace_read:
                     print(f"[DEV_TRACE_READ [2/4] [cluster.resolve] Read lead {ld} is in cluster {c.id}, containing a total of {len(c.leads)} leads")
 
+    # 把clusters存储到文件中
     if config.dev_dump_clusters:
-        # 把clusters存储到文件中
         filename=f"{config.input}.clusters.{svtype}.{leadtab_provider.contig}.{leadtab_provider.start}.{leadtab_provider.end}.bed"
         print(f"Dumping clusters to {filename}")
         with open(filename,"w") as h:
@@ -318,7 +317,8 @@ def resolve(svtype,leadtab_provider,config,tr):
                 # 不再拆分cluster
                 yield cluster
             else:
-                for new_cluster in resplit_bnd(cluster,merge_threshold=config.cluster_merge_bnd):
+                # 按照mate的lead分1kb的bin存储lead，合并，并构建cluster.
+                for new_cluster in resplit_bnd(cluster,merge_threshold=config.cluster_merge_bnd): # 1kb
                     yield new_cluster
         else:
             # 其他类型拆分规则
@@ -328,15 +328,15 @@ def resolve(svtype,leadtab_provider,config,tr):
                 else:
                     merge_inner_threshold=config.cluster_merge_pos # 非重复区域同一个read或cluster上的indels合并的距离, 150 bp.
 
-                merge_inner(cluster,merge_inner_threshold)
+                merge_inner(cluster,merge_inner_threshold) # 对于INS和DEL，符合条件时，合并来自于同一条read上的lead。
 
             if not config.dev_no_resplit_repeat and not config.dev_no_resplit:
                 # 除非设置了不拆分、不拆分重复区域
                 for new_cluster in resplit(cluster,
                                            prop=lambda lead: lead.svlen,
-                                           binsize=config.cluster_resplit_binsize,
-                                           merge_threshold_min=config.minsvlen,
-                                           merge_threshold_frac=config.cluster_merge_len):
+                                           binsize=config.cluster_resplit_binsize, # 20
+                                           merge_threshold_min=config.minsvlen, # 50
+                                           merge_threshold_frac=config.cluster_merge_len): # 0.33
                     yield new_cluster
             else:
                 yield cluster
