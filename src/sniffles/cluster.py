@@ -98,7 +98,7 @@ def resplit(cluster,prop,binsize,merge_threshold_min,merge_threshold_frac):
     """
     根据cluster中lead的sv长度，拆分sv长度之差超过阈值的cluster为新的cluster。
     """
-    # 根据sv的长度把lead分到不同的bin中
+    # 根据sv的长度把lead分到不同的bin中, binsize = 20.
     bins_leads={} # bin -> [lead]
     for lead in cluster.leads:
         bin=int(abs(prop(lead))/binsize)*binsize # svlen / (binsize = 20), 根据sv的长度划分bin
@@ -107,13 +107,14 @@ def resplit(cluster,prop,binsize,merge_threshold_min,merge_threshold_frac):
         else:
             bins_leads[bin].append(lead)
 
+    # 合并cluster.
     new_clusters=list(sorted(bins_leads.keys()))
     i=1
     while len(new_clusters) > 1 and i < len(new_clusters):
         last_cluster=new_clusters[i-1]
         curr_cluster=new_clusters[i]
-        merge_threshold=max(merge_threshold_min,min(curr_cluster,last_cluster)*merge_threshold_frac) # 相邻两个lead的sv长度 * 0.33作为阈值
-        merge=abs(curr_cluster - last_cluster) <= merge_threshold # 两个lead的sv长度在阈值范围内
+        merge_threshold=max(merge_threshold_min,min(curr_cluster,last_cluster)*merge_threshold_frac) # 相邻两个cluster中坐标最小的
+        merge=abs(curr_cluster - last_cluster) <= merge_threshold # 两个cluster的坐标距离在阈值范围内
         if merge:
             bins_leads[new_clusters[i]].extend(bins_leads[new_clusters[i-1]])
             new_clusters.pop(i-1)
@@ -128,7 +129,7 @@ def resplit(cluster,prop,binsize,merge_threshold_min,merge_threshold_frac):
                             start=cluster.start,
                             end=cluster.end,
                             seed=cluster.seed,
-                            leads=bins_leads[cluster_index],
+                            leads=bins_leads[cluster_index], # 调整过
                             repeat=cluster.repeat,
                             leads_long=cluster.leads_long)
         yield new_cluster
@@ -193,11 +194,7 @@ def resplit_bnd(cluster,merge_threshold):
 
 def resolve(svtype,leadtab_provider,config,tr):
     """
-    根据leadtab_provider对象，创建cluster。
-    根据每种sv的leadtab，迭代每个bin，构建cluster。
-    根据一系列条件，合并cluster。
-    根据一系列条件，拆分cluster。
-    返回cluster
+    对于每一种sv，将所有的leads进行聚类，返回cluster。
     """
     leadtab=leadtab_provider.leadtab[svtype] # bin_pos -> [lead01, lead02...]
     seeds=sorted(leadtab_provider.leadtab[svtype])
@@ -331,7 +328,7 @@ def resolve(svtype,leadtab_provider,config,tr):
                 merge_inner(cluster,merge_inner_threshold) # 对于INS和DEL，符合条件时，合并来自于同一条read上的lead。
 
             if not config.dev_no_resplit_repeat and not config.dev_no_resplit:
-                # 除非设置了不拆分、不拆分重复区域
+                # 除非设置了不拆分、不拆分重复区域，否则按照cluster内sv的长度对lead进行重新分组
                 for new_cluster in resplit(cluster,
                                            prop=lambda lead: lead.svlen,
                                            binsize=config.cluster_resplit_binsize, # 20
