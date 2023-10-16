@@ -119,6 +119,7 @@ def call_from(cluster,config,keep_qc_fails,task):
     #Count inline events only once per read, but split events as individual alignments, as in coverage calculation
     #inline_qnames=set(k.read_qname for k in leads if k.source=="INLINE")
     #support=len(inline_qnames)+sum(1 for k in leads if k.source!="INLINE")
+    # 计算支持的read数目
     if svtype=="INS" and svlen>=config.long_ins_length:
         # 对于long INS
         support_long_set=set(lead.read_qname for lead in cluster.leads_long)
@@ -129,7 +130,7 @@ def call_from(cluster,config,keep_qc_fails,task):
         support_long=0
     
     ref_start=util.center(v.ref_start for v in leads) # 出现次数最多的前2个pos对应的ref pos的中值
-    stdev_pos=util.stdev(util.trim((v.ref_start for v in leads))) # 获取1/4-3/4之间的位置，计算位置的std
+    stdev_pos=util.stdev(util.trim((v.ref_start for v in leads))) # 获取1/4-3/4之间的数值，计算位置的std
 
     # 根据sv长度、pos的sd，判断是否精确
     if svtype!="BND":
@@ -200,6 +201,7 @@ def call_from(cluster,config,keep_qc_fails,task):
 
     task.sv_id+=1
 
+    # 返回基本的svcall，主要是坐标、长度等信息
     yield svcall
 
 def merge_inner_bounds(leads,config):
@@ -234,13 +236,14 @@ def resolve_bnd(svcall,cluster,config):
     mate_ref_start=util.center([lead.bnd_info.mate_ref_start for lead in selected])
     is_first=util.most_common_top([lead.bnd_info.is_first for lead in selected])
     is_reverse=util.most_common_top([lead.bnd_info.is_reverse for lead in selected])
+    # 设置ALT信息
     svcall.alt=(("N" if is_first else "") +
                 ("]" if is_reverse else "[" ) +
                 f"{mate_contig}:{mate_ref_start}" +
                 ("]" if is_reverse else "[" ) +
                 ("N" if not is_first else ""))
     svcall.support=len(set(k.read_qname for k in selected))
-    cluster.leads=selected
+    cluster.leads=selected # 只保留最可能mate染色体上的leads，这里是否可以传递到svcall中？
     svcall.bnd_info=SVCallBNDInfo(mate_contig=mate_contig, mate_ref_start=mate_ref_start, is_first=is_first, is_reverse=is_reverse)
     svcall.set_info("CHR2",mate_contig)
 
