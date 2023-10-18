@@ -135,10 +135,10 @@ def coverage_fulfill(requests_for_coverage,calls,lead_provider,config):
             for svcall, field in requests_for_coverage[bin]:
                 setattr(svcall,field,coverage_total_curr)
 
-        coverage_fwd_total+=coverage_fwd # 需要结合leadprovider部分再研究
+        coverage_fwd_total+=coverage_fwd
         coverage_rev_total+=coverage_rev
 
-    average_coverage_fwd=coverage_fwd_total/float(n) if n>0 else 0
+    average_coverage_fwd=coverage_fwd_total/float(n) if n>0 else 0 # 完全覆盖覆盖bin的reads总数
     average_coverage_rev=coverage_rev_total/float(n) if n>0 else 0
     return average_coverage_fwd,average_coverage_rev
 
@@ -208,13 +208,14 @@ def qc_support_const(svcall,config):
 def qc_sv(svcall,config):
     """
     根据一系列条件对svcall进行QC。
+    通过返回True，否则返回False
     """
     af=svcall.get_info("AF")
     af=af if af!=None else 0
     sv_is_mosaic = af <= config.mosaic_af_max
 
     if config.qc_stdev:
-        # 对sv起始位置进行qc
+        # 对sv起始位置std进行qc
         stdev_pos=svcall.get_info("STDEV_POS")
         if stdev_pos > config.qc_stdev_abs_max:
             svcall.filter="STDEV_POS"
@@ -224,7 +225,7 @@ def qc_sv(svcall,config):
             svcall.filter="STDEV_POS"
             return False
 
-        # 对sv的长度进行QC
+        # 对sv长度的std进行QC
         stdev_len = svcall.get_info("STDEV_LEN")
         if stdev_len != None:
             if svcall.svtype != "BND" and stdev_len / abs(svcall.svlen) > 1.0:
@@ -240,22 +241,27 @@ def qc_sv(svcall,config):
         return False
 
     if svcall.svtype=="BND":
+        # BND的链
         if config.qc_bnd_filter_strand and len(set(l.strand for l in svcall.postprocess.cluster.leads))<2:
             svcall.filter="STRAND"
             return False
     elif ((config.mosaic and sv_is_mosaic) and config.mosaic_qc_strand) or (not (config.mosaic and sv_is_mosaic) and config.qc_strand):
+        # mosaic sv
         is_long_ins=(svcall.svtype=="INS" and svcall.svlen >= config.long_ins_length)
         if not is_long_ins and len(set(l.strand for l in svcall.postprocess.cluster.leads))<2:
+            # 非long INS，双链支持
             svcall.filter="STRAND"
             return False
 
     if config.mosaic and sv_is_mosaic:
+        # mosaic sv
         if svcall.svtype=="INV" or svcall.svtype=="DUP" and svcall.svlen < config.mosaic_qc_invdup_min_length:
+            # INV/DUP的长度必须满足阈值500bp.
             svcall.filter="SVLEN_MIN"
             return False
 
     #if (svcall.coverage_upstream != None and svcall.coverage_upstream < config.qc_coverage) or (svcall.coverage_downstream != None and svcall.coverage_downstream < config.qc_coverage):
-    # 非DEL、INS类型，sv中部的coverage不能小于阈值
+    # 非DEL、INS类型，sv中部的coverage不能小于阈值1.
     if svcall.svtype != "DEL" and svcall.svtype != "INS" and (svcall.coverage_center != None and svcall.coverage_center < config.qc_coverage):
         svcall.filter="COV_MIN"
         return False
@@ -277,9 +283,11 @@ def qc_sv(svcall,config):
             svcall.filter="COV_CHANGE"
             return False
 
-    qc_coverage_max_change_frac=config.qc_coverage_max_change_frac
+    qc_coverage_max_change_frac=config.qc_coverage_max_change_frac # -1
     if config.mosaic and sv_is_mosaic:
-        qc_coverage_max_change_frac=config.mosaic_qc_coverage_max_change_frac
+        qc_coverage_max_change_frac=config.mosaic_qc_coverage_max_change_frac # 0.1
+    
+    # 目前这一组条件在胚系不执行，在mosaic执行
     if qc_coverage_max_change_frac != -1.0:
         if svcall.coverage_upstream!=None and svcall.coverage_upstream!=0:
             u=float(svcall.coverage_upstream)
@@ -306,6 +314,7 @@ def qc_sv(svcall,config):
         else:
             d=1.0
 
+        # 相邻两个区域覆盖度波动超过阈值0.1
         if abs(u-s)/max(u,s) > qc_coverage_max_change_frac:
             svcall.filter="COV_CHANGE_FRAC"
             return False
