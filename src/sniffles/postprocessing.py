@@ -25,7 +25,7 @@ def annotate_sv(svcall,config):
 
     # 对sv进行分型
     if config.phase:
-        phase=phase_sv(svcall,config)
+        phase=phase_sv(svcall,config) # 返回phase标签索引或None.
     else:
         phase=None
 
@@ -179,6 +179,7 @@ def qc_support_auto(svcall,coverage_global,config):
     #if svcall.svtype=="INS":
     #    coverage_list=[svcall.coverage_center]
     #else:
+    # 计算局部区域覆盖度
     # 优先使用上下游的覆盖度，再使用sv起始、中间、结尾的覆盖度
     # 如果以上覆盖度都没有，则使用整个task区域的平均覆盖度
     coverage_list=[svcall.coverage_upstream,svcall.coverage_downstream]
@@ -193,6 +194,7 @@ def qc_support_auto(svcall,coverage_global,config):
         coverage_regional=round(sum(coverage_list)/len(coverage_list))
         if coverage_regional==0:
             coverage_regional=coverage_global
+    
     coverage=(coverage_regional*config.minsupport_auto_regional_coverage_weight+coverage_global*(1.0-config.minsupport_auto_regional_coverage_weight))
     min_support=round(config.minsupport_auto_base+config.minsupport_auto_mult*coverage) # 1.5 + 0.1 * coverage?
     return support >= min_support
