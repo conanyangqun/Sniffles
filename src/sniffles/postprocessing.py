@@ -406,7 +406,7 @@ def genotype_sv(svcall,config,phase):
     leads=svcall.postprocess.cluster.leads
     support=rescale_support(svcall,config) # 校正long INS支持的reads数目
 
-    # 根据不同的sv类型设定coverage_list, coverage.
+    # 根据不同的sv类型设定coverage_list，计算整个区域的覆盖度
     if svcall.svtype=="INS":
         coverage_list=[svcall.coverage_center]
     else:
@@ -428,7 +428,7 @@ def genotype_sv(svcall,config,phase):
 
     coverage_list=[c for c in coverage_list if c!=None and c!=0]
 
-    # 覆盖度为0，直接返回
+    # 区域覆盖度为0，直接返回
     if len(coverage_list)==0:
         return
     
@@ -441,9 +441,9 @@ def genotype_sv(svcall,config,phase):
     af=support / float(coverage)
 
     genotype_p = [
-        ((0,0),hom_ref_p),
-        ((0,1),het_p),
-        ((1,1),hom_var_p)
+        ((0,0),hom_ref_p), # 0.05
+        ((0,1),het_p), # 0.5
+        ((1,1),hom_var_p) # 0.95
     ]
 
     # 根据normalization_target对coverage和support进行校正
@@ -481,6 +481,7 @@ def genotype_sv(svcall,config,phase):
             svcall.filter="GT"
 
     if is_long_ins and gt1==(0,0):
+        # long ins类型，但是基因型检测为hom_ref.
         a,b=".","."
     else:
         a,b=gt1
@@ -516,4 +517,5 @@ def phase_sv(svcall,config):
         ps_filter="PASS"
 
     svcall.set_info("PHASE",f"{hp},{ps},{hp_support},{ps_support},{hp_filter},{ps_filter}")
+    # 只根据HP标签来给出结果
     return (config.phase_identifiers.index(hp) if hp in config.phase_identifiers else None if hp_filter=="PASS" else None)
