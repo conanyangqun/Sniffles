@@ -290,8 +290,8 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
     alignments=[]
     anchors={}
     taboo=set()
-    # 迭代每个kmer，先放入anchors。如果再次遇见此kmer，放入taboo中，并从anchors中删除。
-    # 所以，taboo存储出现2次以上的kmer，anchors存储出现1次的kmer（unqiue）。
+    # 迭代best_lead中每个kmer，放入anchors。如果再次遇见此kmer，放入taboo中，并从anchors中删除。
+    # 即taboo存储出现2次以上的kmer，anchors存储出现1次的kmer（unqiue）。
     for i, kmer in iter_kmers(best_lead.seq,klen=klen,skip=skip_repetitive):
         if kmer in taboo:
             continue
