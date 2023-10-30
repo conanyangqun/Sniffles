@@ -279,6 +279,8 @@ def from_leads(leads, initial_lead, max_grp=3, klen=15, skip=1, skip_repetitive=
 def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False):
     """
     根据best lead和其他leads计算INS的ALT序列.
+    根据kmer，以best lead为基础，制作其他lead的一致性序列。
+    符合条件时，提取出现此处最多的碱基
     """
     consensus_min=2
     maxshift=klen
@@ -304,20 +306,22 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
 
         anchors[kmer]=i
 
-    # 迭代每条其他的lead，与best_lead比较，分析一致性序列。
+    # 迭代每条其他的lead，与best_lead比较，获取每条lead的序列
+    # 以best lead为基准，制作每条lead的一致性序列？
+    # ----NNNNN---
     for leadi,lead in enumerate(other_leads):
         last_i=None
         last_j=None
         conseq=""
         span=0
-        # 迭代lead上每条kmer，比较每个unique kmer。
+        # 分析共有的kmer
         for j, kmer in iter_kmers(lead.seq,klen=klen,skip=skip):
             if not kmer in anchors:
                 continue
 
             i=anchors[kmer]
             if abs(i-j) > maxshift:
-                # 两条lead上的unique kmer位置之差大于kmer长度
+                # 两条lead上的unique kmer位置之差大于1个kmer长度
                 continue
 
             if last_i != None and i <= last_i:
@@ -326,7 +330,7 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
 
             if last_i == None:
                 if j>0:
-                    # 第一个unique kmer，且该kmer在当前lead上不是第一个kmer。
+                    # 第一个共有的kmer，且该ker在当前lead上不是第一个kmer
                     conseq="-"*i
             else:
                 # 从第二个unique kmer开始
@@ -343,7 +347,7 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
                         if lead.seq[last_j+l] == best_lead.seq[last_i+l]:
                             m+=1
                     ident=m/float((j-last_j))
-                    if ident >= minident:
+                    if ident >= minident: # 0.5
                         conseq+=lead.seq[last_j:j][:fwd_j]
                     else:
                         conseq+="-"*(fwd_j)
@@ -355,6 +359,7 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
         if len(conseq) < len(best_lead.seq):
             conseq+="-"*(len(best_lead.seq)-len(conseq))
 
+        # 过滤一致性序列？
         conseq_new=[]
         h=0
         while h < len(best_lead.seq):
@@ -364,32 +369,40 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
             else:
                 buffer=[]
                 ident=0
+                # 中间的碱基序列
                 while h < len(best_lead.seq) and conseq[h]!="-":
                     ident+=(best_lead.seq[h]==conseq[h])
                     buffer.append(conseq[h])
                     h+=1
                 if ident/float(len(buffer)) > minident and ident>minident_abs:
+                    # 0.5, 5
+                    # 至少5个碱基一致
                     conseq_new.append("".join(buffer))
                 else:
                     conseq_new.append("-"*len(buffer))
         conseq="".join(conseq_new)
 
         # FIXME: can lead to ZeroDivisionError
+        # 除0错误，表示best lead序列为None
         if span/float(len(best_lead.seq)) > minspan:
+            # 一致性序列占比0.2以上
             alignments.append(conseq)
 
-    # 计算每个位置最大的覆盖度
+    # 迭代每个位置，找到最大的覆盖度所在
     maxal=1
     for i in range(len(best_lead.seq)):
-        maxal=max(maxal,len([best_lead.seq[i]]+[a[i] for a in alignments if not a[i] in "^_"]))
+        maxal=max(maxal,len([best_lead.seq[i]]+[a[i] for a in alignments if not a[i] in "^_"])) # bug?
     maxal=float(maxal)
 
+    # 获取最终的一致性序列
     flattened=""
     for i in range(len(best_lead.seq)):
         al=[a[i] for a in alignments if not a[i]=="-"]
         if len(al) < consensus_min or len(al)/maxal < minalns:
+            # 少于2条序列或者低于0.25总lead数目
             flattened+=best_lead.seq[i]
         else:
+            # 符合条件，使用出现次数最高的碱基
             top=util.most_common([best_lead.seq[i]]+al)
             if len(top)>1 and top[0][0]-top[1][0] >= minbestdiff:
                 # 至少2种碱基，并且A要比B多3条read
