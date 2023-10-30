@@ -138,6 +138,7 @@ def make_group(lead,klen,skip,repetitive_kmers):
 def iter_kmers(seq,klen,skip):
     """
     根据klen和skip生成seq的子序列。
+    每隔skip生成klen长度的子序列.
     """
     for i in range(0,len(seq)-klen,skip):
         yield (i,seq[i:i+klen])
@@ -277,7 +278,7 @@ def from_leads(leads, initial_lead, max_grp=3, klen=15, skip=1, skip_repetitive=
 
 def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False):
     """
-    根据best lead和其他leads，计算INS的ALT序列。
+    根据best lead和其他leads计算INS的ALT序列.
     """
     consensus_min=2
     maxshift=klen
