@@ -339,23 +339,29 @@ def qc_sv_post_annotate(svcall,config):
     # 根据SV的基因型、覆盖度进行QC
     af=svcall.get_info("AF")
     af=af if af!=None else 0
-    sv_is_mosaic = af <= config.mosaic_af_max
+    sv_is_mosaic = af <= config.mosaic_af_max # 0.3
 
     if (len(svcall.genotypes)==0 or (svcall.genotypes[0][0]!="." and svcall.genotypes[0][0]+svcall.genotypes[0][1]<2)) and (svcall.coverage_center != None and svcall.coverage_center < config.qc_coverage):
+        # hom_ref, het基因型, coverage_center小于阈值1
         svcall.filter="COV_MIN" # 覆盖度不足
         return False
 
     qc_nm=config.qc_nm
-    qc_nm_threshold=config.qc_nm_threshold*config.qc_nm_mult
+    qc_nm_threshold=config.qc_nm_threshold*config.qc_nm_mult # 当前region的NM * 1.66
     if config.mosaic and sv_is_mosaic:
+        # mosaic
         qc_nm=config.mosaic_qc_nm
         qc_nm_threshold=config.qc_nm_threshold*config.qc_nm_mult
+    
     if qc_nm and svcall.nm > qc_nm_threshold and (len(svcall.genotypes)==0 or svcall.genotypes[0][1]==0):
+        # NM超过阈值，没有基因型或基因型为HOM_REF.
         svcall.filter="ALN_NM"
         return False
 
     if config.mosaic:
+        # mosaic模式
         if sv_is_mosaic and ( af < config.mosaic_af_min or af > config.mosaic_af_max ):
+            # mosaic SV AF不符合预期0.05-0.3.
             svcall.filter="MOSAIC_AF"
             return False
         elif not sv_is_mosaic and not config.mosaic_include_germline:
