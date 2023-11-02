@@ -374,12 +374,15 @@ def novel_from_reads(best_lead,other_leads,klen,skip,skip_repetitive,debug=False
                     ident+=(best_lead.seq[h]==conseq[h])
                     buffer.append(conseq[h])
                     h+=1
+                
+                # 这段代码是不是部分冗余了？
                 if ident/float(len(buffer)) > minident and ident>minident_abs:
                     # 0.5, 5
                     # 至少5个碱基一致
                     conseq_new.append("".join(buffer))
                 else:
                     conseq_new.append("-"*len(buffer))
+
         conseq="".join(conseq_new)
 
         # FIXME: can lead to ZeroDivisionError

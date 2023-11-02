@@ -39,13 +39,17 @@ class SNFile:
         self.handle=open(self.filename,"rb")
 
     def store(self,svcand):
-        # 把候选sv存储到blocks窗口中
+        # 把候选sv存储到blocks窗口中, 100kb.
         block_index=int(svcand.pos/self.config.snf_block_size)*self.config.snf_block_size
+
+        # 初始化
         if not block_index in self.blocks:
             self.blocks[block_index]={svtype: [] for svtype in sv.TYPES}
             self.blocks[block_index]["_COVERAGE"]={}
+        
         if not self.config.output_rnames:
             svcand.rnames=None
+ 
         self.blocks[block_index][svcand.svtype].append(svcand)
 
     def annotate_block_coverages(self,lead_provider,resolution=500):

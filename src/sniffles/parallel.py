@@ -262,7 +262,7 @@ def Main_Internal(proc_id,config,pipe):
             else:
                 result["svcalls"]=[s for s in svcalls if s.qc]
 
-            # 是否输出snf文件
+            # 输出snf文件
             if config.snf != None: # and len(svcandidates):
                 # 每个task生成snf文件
                 snf_filename=f"{config.snf}.tmp_{task.id}.snf"
