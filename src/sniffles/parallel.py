@@ -273,8 +273,9 @@ def Main_Internal(proc_id,config,pipe):
                     for cand in svcandidates:
                         snf_out.store(cand)
                     snf_out.annotate_block_coverages(task.lead_provider) # 给block添加覆盖度信息
-                    snf_out.write_and_index()
-                    handle.close()
+                    snf_out.write_and_index() # 把block数据序列化并输出
+                    handle.close() # 冗余代码
+                
                 result["snf_filename"]=snf_filename
                 result["snf_index"]=snf_out.get_index()
                 result["snf_total_length"]=snf_out.get_total_length()

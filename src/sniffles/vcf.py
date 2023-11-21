@@ -162,6 +162,7 @@ class VCF:
         self.write_raw("##"+text)
 
     def write_call(self,call):
+        # 把svcall输出为VCF record
         #pysam coordinates are 0-based, VCF 1-based - therefore +1 is added to call.pos
         end=call.end + 1
         pos=call.pos + 1

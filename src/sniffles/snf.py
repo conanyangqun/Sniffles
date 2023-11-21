@@ -53,7 +53,7 @@ class SNFile:
         self.blocks[block_index][svcand.svtype].append(svcand)
 
     def annotate_block_coverages(self,lead_provider,resolution=500):
-        # 根据lead_provider中的覆盖度，每n个窗口统计一次覆盖度，记录到block中
+        # 根据lead_provider中的覆盖度，每5个窗口统计一次覆盖度，记录到block中
         config=self.config
         start_bin=lead_provider.covrtab_min_bin
         end_bin=int(lead_provider.end/config.coverage_binsize)*config.coverage_binsize
@@ -63,7 +63,7 @@ class SNFile:
         coverage_sum=0
         bin_count=0
 
-        coverage_binsize_combine=self.config.coverage_binsize_combine
+        coverage_binsize_combine=self.config.coverage_binsize_combine # 5 * cluster_bin_size
         snf_block_size=config.snf_block_size
 
         # 迭代每个覆盖度窗口
@@ -77,7 +77,7 @@ class SNFile:
             coverage_sum+=coverage_fwd+coverage_rev
             bin_count+=1
 
-            # 以一定数目合并覆盖度窗口
+            # 每5个窗口统计1次
             if bin%coverage_binsize_combine==0:
                 block_index=int(bin/snf_block_size)*snf_block_size
 
@@ -93,6 +93,7 @@ class SNFile:
                 bin_count=0
 
     def serialize_block(self,block_id):
+        # 把字典序列化
         return pickle.dumps(self.blocks[block_id])
 
     def unserialize_block(self,data):
@@ -102,6 +103,7 @@ class SNFile:
         # 把blocks的数据输出到二进制文件并索引
         if not self.is_open():
             self.open()
+        
         offset=0
         for block_id in sorted(self.blocks):
             data=gzip.compress(self.serialize_block(block_id))
@@ -110,6 +112,7 @@ class SNFile:
             self.index[block_id]=(offset,data_len) # 二进制数据偏移量
             offset+=data_len
             self.total_length+=data_len
+        
         if self.config.combine_close_handles:
             self.close()
 
@@ -164,7 +167,7 @@ class SNFile:
         return self.index
 
     def get_total_length(self):
-        # 返回总长度
+        # 返回数据总大小
         return self.total_length
 
     def close(self):
