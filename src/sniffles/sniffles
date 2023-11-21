@@ -507,35 +507,41 @@ def Sniffles2_Main(config,processes):
                     command,result=proc.pipe_main.recv()
                     if command=="worker_exception":
                         util.fatal_error_main("An exception occured in a worker process (see surrounding error messages)")
+                    
+                    # 获取返回的结果
                     assert(command=="return_"+config.mode)
                     processed_read_count+=result["processed_read_count"]
                     processes_busy.remove(proc)
                     processes_free.append(proc)
                     tasks_done_count+=1
 
+                    # 根据task_id重建task对象
                     task_id=result["task_id"]
                     task=tasks_list[task_id]
                     assert(task.id==task_id)
 
+                    # call_sample, combine模式，输出VCF
                     if config.mode=="call_sample" or config.mode=="combine":
-                        # call sample, combine, 输出VCF
                         if config.vcf != None:
                             svcalls=result["svcalls"]
                             sv_count+=len(svcalls)
 
                             if config.sort:
+                                # 根据task_id排序后输出svcall
                                 if not task_id in task_id_calls:
                                     task_id_calls[task_id]=[]
                                 task_id_calls[task_id].extend(svcalls)
                             else:
+                                # 输出未排序的svcall
                                 for svcall in svcalls:
                                     vcf_out.write_call(svcall)
 
                     elif config.mode=="genotype_vcf":
                         for svcall in result["svcalls"]:
-                            assert(not (svcall.raw_vcf_line_index in genotype_lineindex_svcalls_returned))
+                            assert(not (svcall.raw_vcf_line_index in genotype_lineindex_svcalls_returned)) # 确保svcall不重复输出
                             genotype_lineindex_svcalls_returned[svcall.raw_vcf_line_index]=svcall
 
+                    # call_sample模式，收集task对应的snf文件信息
                     if config.mode=="call_sample":
                         if config.snf != None and result["has_snf"]:
                             #if result["snf_candidate_count"] > 0:

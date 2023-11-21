@@ -173,9 +173,11 @@ class VCF:
         for internal_id, sample_id in self.config.sample_ids_vcf:
             if internal_id in call.genotypes and call.genotypes[internal_id]!=None:
                 gt_curr=call.genotypes[internal_id]
-                sample_genotypes.append(format_genotype(gt_curr))
+                sample_genotypes.append(format_genotype(gt_curr)) # 根据基因型信息返回基因型字符串，即vcf的format列
+                
                 if gt_curr[0]!="." and gt_curr[4]>0: #Not non-genotype and has supporting reads
-                    ac+=sum(call.genotypes[internal_id][:2])
+                    # 非./.且ALT有reads支持
+                    ac+=sum(call.genotypes[internal_id][:2]) # 0/0, 0/1, 1/1
                     supp="1"
                 else:
                     supp="0"
@@ -184,12 +186,14 @@ class VCF:
                 supp="0"
             supvec.append(supp)
 
+        # 多于1个样本, combine模式
         if len(self.config.sample_ids_vcf) > 1:
             call.set_info("AC",ac)
             call.set_info("SUPP_VEC","".join(supvec))
             if ac==0:
                 call.filter="GT"
 
+        # 输出SV的属性，主要是INFO列信息
         #Output core SV attributes
         infos={"SVTYPE": call.svtype,
                "SVLEN": call.svlen,
@@ -213,6 +217,7 @@ class VCF:
         infos_ordered.extend(format_info(k,infos[k]) for k in self.info_order if infos[k]!=None)
         info_str=";".join(infos_ordered)
 
+        # 输出svcall特异的信息
         #Output call specific additional information
         for k in sorted(call.info):
             if call.info[k]==None:
@@ -222,6 +227,7 @@ class VCF:
         #if call.id==None:
         #    call.id=f"Sniffles2.{call.svtype}.{self.call_count+1:06}"
 
+        # 对于DEL编译，获取其REF序列
         #Resolve DEL sequence
         if not self.config.symbolic and call.svtype=="DEL" and self.reference_handle != None and abs(call.svlen) <= self.config.max_del_seq_len:
             # del类型，但是不属于大del类型，从ref获取序列
