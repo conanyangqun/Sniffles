@@ -552,6 +552,7 @@ def Sniffles2_Main(config,processes):
     #
     # Store avg. coverages for .snf file
     #
+    # 根据task SNF文件中的覆盖度，计算每个contig的平均覆盖度
     if config.mode=="call_sample" and config.snf != None:
         for contig in contig_coverages:
             contig_coverages[contig]=sum(contig_coverages[contig])/len(contig_coverages[contig]) if len(contig_coverages[contig])>0 else 0
@@ -565,6 +566,7 @@ def Sniffles2_Main(config,processes):
     #
     # Output results
     #
+    # 输出VCF文件
     lastcall=None
     if (config.mode=="call_sample" or config.mode=="combine") and config.vcf != None and config.sort:
         # call_sample, combine模式，输出排序的VCF文件
