@@ -566,12 +566,12 @@ def Sniffles2_Main(config,processes):
     #
     # Output results
     #
-    # 输出VCF文件
+    # 输出排序的VCF文件
     lastcall=None
     if (config.mode=="call_sample" or config.mode=="combine") and config.vcf != None and config.sort:
         # call_sample, combine模式，输出排序的VCF文件
         #TODO: Look into calls placed outside their respective task's range
-        # 迭代每个task和每个svcall，判断svcall是否在task范围内。寻找svcall合适的task范围。
+        # 迭代每个task和每个svcall，判断svcall是否在task范围内。给svcall寻找合适的task。
         reassigned_count=0
         ignored_count=0
         sort_start_time=time.time()
@@ -586,7 +586,7 @@ def Sniffles2_Main(config,processes):
                     if len(new_target_tasks)!=1:
                         print(f"WARNING: Unable to assign call at {call.contig}:{call.pos} to unambiguous task. (got {len(new_target_tasks)} intervals). SVCall={call}")
                         if len(new_target_tasks)==0:
-                            # 未找到svcall的task
+                            # 未找到svcall的task时忽略此svcall
                             continue
                     
                     # 给svcall分配新的task
@@ -598,6 +598,7 @@ def Sniffles2_Main(config,processes):
                     reassigned_count+=1
 
         # 按照顺序输出svcall。
+        # 这里借助了task list排序列表
         for task in tasks_list: #Tasks are already sorted by contig/coordinate (from .bam index)
             if not task.id in task_id_calls:
                 continue
@@ -607,6 +608,7 @@ def Sniffles2_Main(config,processes):
                 #assert(call.pos < task.end)
                 #assert(call.contig==task.contig)
                 if call.pos < task.start or call.pos >= task.end or call.contig != task.contig:
+                    # 忽略不在此task范围内的svcall
                     ignored_count+=1
                 else:
                     vcf_out.write_call(call)
@@ -614,6 +616,7 @@ def Sniffles2_Main(config,processes):
         if reassigned_count!=ignored_count:
             print(f"ERROR: {ignored_count} calls ignored, but only {reassigned_count} were reassigned to correct tasks")
 
+    # call_sample模式，输出SNF文件
     if config.mode=="call_sample" and config.snf != None:
         #
         # Combine regional temporary .snf files from workers
@@ -622,7 +625,7 @@ def Sniffles2_Main(config,processes):
         main_index={}
         offset=0
         parts_sorted=sorted(snf_parts,key=lambda p: p["task"].id)
-        # 迭代每个部分，统计snf文件的头信息
+        # 迭代每个task snf文件，准备合并
         for part in parts_sorted:
             part_contig=part["task"].contig
             if not part_contig in main_index:
