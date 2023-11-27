@@ -140,7 +140,7 @@ def Sniffles2_Main(config,processes):
     #
     #genotype_vcf: Read SVs from VCF to be genotyped
     #
-    # 读取VCF中的SV，并以SVCall类表示
+    # genotype_vcf模式，读取VCF中的SV，并以SVCall类表示
     if config.mode=="genotype_vcf":
         path,ext=os.path.splitext(config.genotype_vcf)
         ext=ext.lower()
