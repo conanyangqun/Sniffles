@@ -626,6 +626,7 @@ def Sniffles2_Main(config,processes):
         offset=0
         parts_sorted=sorted(snf_parts,key=lambda p: p["task"].id)
         # 迭代每个task snf文件，准备合并
+        # 按照contig, block重新组织所有的SNF文件
         for part in parts_sorted:
             part_contig=part["task"].contig
             if not part_contig in main_index:
@@ -633,14 +634,14 @@ def Sniffles2_Main(config,processes):
             for block,(part_block_start,part_block_len) in part["snf_index"].items():
                 if not block in main_index[part_contig]:
                     main_index[part_contig][block]=[]
-                main_index[part_contig][block].append((part_block_start+offset,part_block_len))
+                main_index[part_contig][block].append((part_block_start+offset,part_block_len)) # offset表示整个文件的偏移量
             offset+=part["snf_total_length"]
 
         header={"config": config.__dict__, "index": main_index, "snf_candidate_count": snf_candidate_count}
         header_json=json.dumps(header, default=lambda obj: "<Unstored_Object>")+"\n"
         snf_out.handle.write(header_json.encode())
 
-        # 迭代每个snf文件部分，输出文件内容
+        # 迭代每个snf文件部分，以二进制形式输出文件内容
         for part in parts_sorted:
             with open(part["snf_filename"],"rb") as part_handle:
                 part_data=part_handle.read()
@@ -654,8 +655,8 @@ def Sniffles2_Main(config,processes):
     if DEV_MONITOR_MEM:
         print(f"[DEV: Total memory usage={dbg_get_total_memory_usage_MB():.2f}MB]") #TODO: Remove (prod)
 
+    # genotype_vcf模式，按照原sv的顺序输出新的svcall结果
     if config.mode=="genotype_vcf":
-        # genotype_vcf模式，按照原sv的顺序输出新的svcall结果。
         vcf_out.rewrite_header_genotype(vcf_in.header_str)
 
         for lineindex in genotype_lineindex_order:
@@ -665,6 +666,7 @@ def Sniffles2_Main(config,processes):
     # 关闭vcf输出文件
     if config.vcf!=None:
         vcf_out.close()
+        # 输出vcf.gz文件，用pysam.tabix_index生成Index
         if config.vcf_output_bgz:
             vcf_index_start_time=time.time()
             print(f"Generating index for {config.vcf}...")
