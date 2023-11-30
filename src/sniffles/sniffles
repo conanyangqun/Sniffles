@@ -265,7 +265,7 @@ def Sniffles2_Main(config,processes):
                 # cram，一条染色体一个task。
                 task_count=1
             else:
-                task_count=max(1,math.ceil(contig.mapped / float(task_max_reads))) # bam，一条染色体一个task
+                task_count=max(1,math.ceil(contig.mapped / float(task_max_reads)))
             
             contig_str=str(contig.contig)
             contig_length=bam_in.get_reference_length(contig_str)
@@ -285,7 +285,7 @@ def Sniffles2_Main(config,processes):
                     else:
                         genotype_svs=[]
                 else:
-                    genotype_svs=None
+                    genotype_svs=None # 这里混用了None和[]，注意其影响
 
                 # 创建task任务
                 task=parallel.Task(id=task_id,
@@ -302,6 +302,8 @@ def Sniffles2_Main(config,processes):
                 contig_tasks_intervals[contig_str].append((task.start,task.end,task))
                 startpos+=task_length
                 task_id+=1
+        
+        # 把contig长度信息保存起来
         config.contig_lengths=contig_lengths
 
         if contigs_with_tr_annotations < len(contig_lengths) and config.tandem_repeats!=None:
@@ -403,7 +405,7 @@ def Sniffles2_Main(config,processes):
     #
     # 创建分析进程
     for proc in range(config.threads):
-        pipe_main,pipe_proc=multiprocessing.Pipe()
+        pipe_main,pipe_proc=multiprocessing.Pipe() # 管道
         proc=parallel.Process(id=proc,process=multiprocessing.Process(target=parallel.Main,args=(proc,config,pipe_proc)),pipe_main=pipe_main,externals=[])
         processes.append(proc)
 
@@ -516,6 +518,7 @@ def Sniffles2_Main(config,processes):
                     tasks_done_count+=1
 
                     # 根据task_id重建task对象
+                    # 能否通过管道直接传递原始的task对象？
                     task_id=result["task_id"]
                     task=tasks_list[task_id]
                     assert(task.id==task_id)
@@ -577,6 +580,7 @@ def Sniffles2_Main(config,processes):
         sort_start_time=time.time()
         for task in tasks_list:
             if not task.id in task_id_calls:
+                # 该task没有calls
                 continue
             # 根据task id获取检出的svcalls。
             for call in sorted(task_id_calls[task.id],key=lambda call: call.pos):
@@ -609,6 +613,7 @@ def Sniffles2_Main(config,processes):
                 #assert(call.contig==task.contig)
                 if call.pos < task.start or call.pos >= task.end or call.contig != task.contig:
                     # 忽略不在此task范围内的svcall
+                    # 此时应该不会有此范围的svcall
                     ignored_count+=1
                 else:
                     vcf_out.write_call(call)
@@ -622,7 +627,7 @@ def Sniffles2_Main(config,processes):
         # Combine regional temporary .snf files from workers
         #
         # call_sample模式，输出SNF文件。
-        main_index={}
+        main_index={} # 以contig -> block -> []形式存储
         offset=0
         parts_sorted=sorted(snf_parts,key=lambda p: p["task"].id)
         # 迭代每个task snf文件，准备合并
