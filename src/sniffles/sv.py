@@ -394,7 +394,7 @@ def classify_splits(read,leads,config,main_contig):
     maxsvlen_other=minsvlen_screen*config.dev_split_max_query_distance_mult # 35 * 0.9 * 5
     min_split_len_bnd=config.bnd_min_split_length # 35bp * 0.9 * 5
 
-    leads.sort(key=lambda ld: ld.qry_start)
+    leads.sort(key=lambda ld: ld.qry_start) # 根据比对片段在read上的位置排序
     last=leads[0]
     last.svtypes_starts_lens=[]
 

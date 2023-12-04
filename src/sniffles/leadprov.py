@@ -387,7 +387,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
     #End QC
 
     if read.is_reverse:
-        qry_start=read.query_length-read.query_alignment_end # 这里将-转换为+情况？
+        qry_start=read.query_length-read.query_alignment_end # 这里以read 5'作为起始坐标
     else:
         qry_start=read.query_alignment_start
 
@@ -500,6 +500,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
                 # 其他类型的SV
                 svlen=arg
 
+                # DEL类型, ref_start > ref_end.
                 yield Lead(read_id=lead.read_id,
                            read_qname=lead.read_qname,
                            contig=lead.contig,
