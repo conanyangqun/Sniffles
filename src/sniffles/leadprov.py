@@ -293,6 +293,7 @@ def read_itersplits_bnd(read_id,read,contig,config,read_nm):
         #Primary alignment is on this chromosome, no need to parse the supplementary
         # primary比对在当前染色体上，则无须解析.
         # 即，read的sup比对到了目标区域，primary比对在同一条染色体的其他部分
+        # 这里只解析BND类型
         return
 
     minpos_curr_chr=min(itertools.chain([read.reference_start],(int(pos) for refname,pos,strand,cigar,mapq,nm in supps if refname==contig)))
