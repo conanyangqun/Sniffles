@@ -387,7 +387,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
     #End QC
 
     if read.is_reverse:
-        qry_start=read.query_length-read.query_alignment_end # 按照read来确定方向
+        qry_start=read.query_length-read.query_alignment_end # 这里将-转换为+情况？
     else:
         qry_start=read.query_alignment_start
 
@@ -401,7 +401,7 @@ def read_itersplits(read_id,read,contig,config,read_nm):
                    "-" if read.is_reverse else "+",
                    read.mapping_quality,
                    read_nm,
-                   "SPLIT_PRIM", # split比对的primary比对
+                   "SPLIT_PRIM", # primary比对的sup部分
                    "?")
     all_leads.append(curr_lead)
 
@@ -636,12 +636,13 @@ class LeadProvider:
             alen=read.query_alignment_length
 
             # 过滤reads
+            # 后续分析只有primary和supplementary
             if read.mapping_quality < mapq_min or read.is_secondary or alen < alen_min:
                 # mapping quality < 25, secondary, query_alignment_length < 1000 bp
                 continue
 
             has_sa=read.has_tag("SA") # supplementary alignment？
-            use_clips=self.config.detect_large_ins and not read.is_supplementary and not has_sa # 检测大ins，非sup比对，没有SA标签的reads
+            use_clips=self.config.detect_large_ins and not read.is_supplementary and not has_sa # 检测大ins，非sup比对，没有SA标签的reads，使用其clip的碱基
 
             nm=-1
             curr_read_id=self.read_id
