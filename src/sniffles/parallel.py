@@ -69,7 +69,7 @@ class Task:
                             print(f"[DEV_TRACE_READ] [3/4] [Task.call_candidates] Read {config.dev_trace_read} -> Cluster {svcluster.id} -> preliminary SVCall {svcall_copy}")
                     candidates.append(svcall)
 
-        self.coverage_average_fwd,self.coverage_average_rev=postprocessing.coverage(candidates,self.lead_provider,config)
+        self.coverage_average_fwd,self.coverage_average_rev=postprocessing.coverage(candidates,self.lead_provider,config) # 某个task区域的平均覆盖度
         self.coverage_average_total=self.coverage_average_fwd+self.coverage_average_rev
         return candidates
 
@@ -274,7 +274,7 @@ def Main_Internal(proc_id,config,pipe):
                         snf_out.store(cand)
                     snf_out.annotate_block_coverages(task.lead_provider) # 给block添加覆盖度信息
                     snf_out.write_and_index() # 把block数据序列化并输出
-                    handle.close() # 冗余代码
+                    handle.close()
                 
                 result["snf_filename"]=snf_filename
                 result["snf_index"]=snf_out.get_index()

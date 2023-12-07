@@ -727,6 +727,7 @@ class LeadProvider:
                     target_tab[covr_end_bin]=target_tab[covr_end_bin]-1 if covr_end_bin in target_tab else -1
 
         # 计算当前区域的平均NM，作为阈值
+        # 这里赋值给全局变量config，会不会影响不同实例？即不同的区域
         self.config.average_regional_nm=nm_sum/float(max(1,nm_count))
         self.config.qc_nm_threshold=self.config.average_regional_nm
         #print(f"Contig {contig} avg. regional NM={self.config.average_regional_nm}, threshold={self.config.qc_nm_threshold}")

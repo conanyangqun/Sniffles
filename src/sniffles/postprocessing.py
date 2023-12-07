@@ -209,9 +209,11 @@ def qc_support_const(svcall,config):
 
 def qc_sv(svcall,config):
     """
-    根据一系列条件对svcall进行QC。
-    通过返回True，否则返回False
+    根据一系列条件对svcall进行QC，返回True/False。
+    主要判断是pos, length的std及coverage。
     """
+
+    # 这里并未设置AF信息，因此会导致sv判断为mosaic
     af=svcall.get_info("AF")
     af=af if af!=None else 0
     sv_is_mosaic = af <= config.mosaic_af_max
@@ -255,6 +257,7 @@ def qc_sv(svcall,config):
             svcall.filter="STRAND"
             return False
 
+    # 这个判断条件有问题
     if config.mosaic and sv_is_mosaic:
         # mosaic sv
         if svcall.svtype=="INV" or svcall.svtype=="DUP" and svcall.svlen < config.mosaic_qc_invdup_min_length:
