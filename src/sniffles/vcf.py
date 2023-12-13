@@ -283,7 +283,7 @@ class VCF:
                 
                 call=sv.SVCall(contig=CHROM,
                                pos=int(POS)-1, # 0-based？
-                               id=line_index,
+                               id=line_index, # 1-based.
                                ref=REF,
                                alt=ALT,
                                qual=QUAL,

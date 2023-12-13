@@ -155,7 +155,7 @@ def Sniffles2_Main(config,processes):
         genotype_lineindex_order=[] # sv的行索引
         genotype_lineindex_svs={} # 以sv的行索引为key，存储sv
         genotype_contig_svs={} # 以contig为单位存储svcall
-        genotype_lineindex_svcalls_returned={} # ？
+        genotype_lineindex_svcalls_returned={} # 用来存储数据分析后返回的svcall
         # svcall为表示SV的类
         for svcall in vcf_in.read_svs_iter():
             if not svcall.contig in genotype_contig_svs:
