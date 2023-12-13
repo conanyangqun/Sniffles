@@ -339,14 +339,19 @@ class VCF:
                 util.fatal_error(f"Error parsing input VCF: Line {line_index}: {e}")
 
     def rewrite_genotype(self,svcall):
-        parts_no_gt=svcall.raw_vcf_line.split("\t")[:8]
+        """
+        从svcall中提取原VCF中INFO前的信息，重写GT等信息后输出
+        """
+        parts_no_gt=svcall.raw_vcf_line.split("\t")[:8] # info之前信息不变
         gt_format=self.config.genotype_format
         if svcall.genotype_match_sv != None:
+            # 目标sv检出
             if len(svcall.genotype_match_sv.genotypes)>0:
                 gt=svcall.genotype_match_sv.genotypes[0]
             else:
                 gt=svcall.genotypes[0]
         else:
+            # 目标sv未检出
             gt=svcall.genotypes[0] #0/0 or ./. depending on whether input SV had coverage in sample
         #parts=parts_no_gt + [gt_format,vcf.format_genotype(gt)]
         #gt_vcf=svcall.raw_vcf_line.split("\t")[9].split(":")[0]
@@ -358,6 +363,9 @@ class VCF:
         self.write_raw("\t".join(parts))
 
     def rewrite_header_genotype(self,orig_header):
+        """
+        在原VCF头信息基础上添加新的头信息
+        """
         header_lines=orig_header.split("\n")
         header_lines.insert(1,'##genotypeFileDate="'+self.config.start_date+'"')
         header_lines.insert(1,'##genotypeCommand="'+self.config.command+'"')
