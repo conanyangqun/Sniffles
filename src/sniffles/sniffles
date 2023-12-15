@@ -382,7 +382,8 @@ def Sniffles2_Main(config,processes):
 
         #TODO: Assure header consistency across multiple .snfs
 
-        # 迭代每个contig，设置Task。一个contig一个task。
+        # 迭代每个contig，创建Task.
+        # 这里使用最后一个SNF文件得contigs信息
         for contig_str,contig_length in contig_lengths:
             task=parallel.Task(id=task_id,contig=contig_str,start=0,end=contig_length-1,assigned_process_id=None,sv_id=0)
             tasks_list.append(task)
