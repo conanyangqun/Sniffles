@@ -110,6 +110,10 @@ class Task:
         return passed
 
     def combine(self,config):
+        """
+        多样本snf文件联合检出
+        """
+        # 读取SNF文件头信息
         samples_headers_snf={}
         for snf_info in config.snf_input_info:
             snf_in=snf.SNFile(config,open(snf_info["filename"],"rb"),filename=snf_info["filename"])
@@ -123,10 +127,11 @@ class Task:
 
         #block_groups_keep_threshold=5000
         #TODO: Parameterize
-        bin_min_size=config.combine_min_size
+        bin_min_size=config.combine_min_size # 100.
         bin_max_candidates=max(25,int(len(config.snf_input_info)*0.5))
-        overlap_abs=config.combine_overlap_abs
+        overlap_abs=config.combine_overlap_abs # 2500.
 
+        # 读取样本内部ID
         sample_internal_ids=set()
         for sample_internal_id,(sample_filename,sample_header,sample_snf) in samples_headers_snf.items():
             sample_internal_ids.add(sample_internal_id)
