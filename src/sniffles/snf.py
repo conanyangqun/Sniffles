@@ -129,7 +129,7 @@ class SNFile:
         except Exception as e:
             print(f"Error when reading SNF header from '{self.filename}': {e}. The file may not be a valid .snf file or could have been corrupted.")
             raise e
-        self.index=self.header["index"]
+        self.index=self.header["index"] # contig -> block -> [(block_offset, block_len)]
         if self.config.combine_close_handles:
             self.close()
 

@@ -139,18 +139,20 @@ class Task:
         #
         # Load candidate SVs from all samples for each block separately and cluster them based on start position
         #
+        # 迭代每个block, 获取所有样本的candidate svs，并按照位置聚类
         had=False
         candidates_processed=0
         svtypes_candidates_bins={svtype: {} for svtype in sv.TYPES}
         groups_keep={svtype:list() for svtype in sv.TYPES}
-        for block_index in range(self.start,self.end+config.snf_block_size,config.snf_block_size):
+        for block_index in range(self.start,self.end+config.snf_block_size,config.snf_block_size): # 这里是因为start=0,即第一个block
+            # 读取某个block下所有样本的数据
             samples_blocks={}
             for sample_internal_id,(sample_filename,sample_header,sample_snf) in samples_headers_snf.items():
-                blocks=sample_snf.read_blocks(self.contig,block_index)
+                blocks=sample_snf.read_blocks(self.contig,block_index) # 获取该block的数据
                 samples_blocks[sample_internal_id]=blocks
 
             for svtype in sv.TYPES:
-                bins={}
+                bins={} # 存储所有样本某个sv类型的所有cand.
                 #svcandidates=[]
                 for sample_internal_id,(sample_filename,sample_header,sample_snf) in samples_headers_snf.items():
                     blocks=samples_blocks[sample_internal_id]
@@ -163,13 +165,14 @@ class Task:
 
                             cand.sample_internal_id=sample_internal_id
 
-                            bin=int(cand.pos/bin_min_size)*bin_min_size
+                            bin=int(cand.pos/bin_min_size)*bin_min_size # 分100bp存储cand
                             if not bin in bins:
                                 bins[bin]=[cand]
                             else:
                                 bins[bin].append(cand)
                         candidates_processed+=len(block[svtype])
-
+                
+                # 某种类型的sv没有cand
                 if len(bins)==0:
                     continue
 
@@ -184,6 +187,7 @@ class Task:
                     size+=bin_min_size
 
                     if (not config.combine_exhaustive and len(svcands) >= bin_max_candidates) or curr_bin == last_bin:
+                        # 非详尽模式，svcands数目超过阈值
                         if len(svcands)==0:
                             size=0
                             continue
