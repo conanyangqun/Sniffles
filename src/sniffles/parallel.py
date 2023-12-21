@@ -123,11 +123,11 @@ class Task:
             if config.combine_close_handles:
                 snf_in.close()
 
-        svcalls=[]
+        svcalls=[] # 存储最后检出的svcall
 
         #block_groups_keep_threshold=5000
         #TODO: Parameterize
-        bin_min_size=config.combine_min_size # 100.
+        bin_min_size=config.combine_min_size # 合并cand的窗口, 默认100bp.
         bin_max_candidates=max(25,int(len(config.snf_input_info)*0.5)) # SNF文件数目一半，最大25
         overlap_abs=config.combine_overlap_abs # 2500.
 
@@ -144,27 +144,33 @@ class Task:
         candidates_processed=0
         svtypes_candidates_bins={svtype: {} for svtype in sv.TYPES}
         groups_keep={svtype:list() for svtype in sv.TYPES}
+
+        # 迭代每个block
         for block_index in range(self.start,self.end+config.snf_block_size,config.snf_block_size): # 这里是因为start=0,即第一个block
+            
             # 读取某个block下所有样本的数据
             samples_blocks={}
             for sample_internal_id,(sample_filename,sample_header,sample_snf) in samples_headers_snf.items():
                 blocks=sample_snf.read_blocks(self.contig,block_index) # 获取该block的数据
                 samples_blocks[sample_internal_id]=blocks
 
+            # 迭代每种sv
             for svtype in sv.TYPES:
-                bins={} # 存储所有样本某个sv类型的所有cand.
+                bins={} # 分bin存储所有样本某个sv类型的所有cand.
                 #svcandidates=[]
                 for sample_internal_id,(sample_filename,sample_header,sample_snf) in samples_headers_snf.items():
-                    blocks=samples_blocks[sample_internal_id]
+                    blocks=samples_blocks[sample_internal_id] # 某个block内某个样本的数据
                     if blocks==None:
                         continue
                     for block in blocks:
+                        # block是字典对象, 包含了某个task在当前block内所有的cands.
                         for cand in block[svtype]:
                             #if config.combine_pass_only and (cand.qc==False or cand.filter!="PASS"):
                             #    continue
 
                             cand.sample_internal_id=sample_internal_id
 
+                            # 按照新的bin大小存储cand.
                             bin=int(cand.pos/bin_min_size)*bin_min_size # 分100bp存储cand
                             if not bin in bins:
                                 bins[bin]=[cand]
@@ -175,7 +181,8 @@ class Task:
                 # 某种类型的sv没有cand
                 if len(bins)==0:
                     continue
-
+                
+                # 按条件给sv分组
                 curr_bin=0
                 size=0
                 svcands=[]
@@ -186,8 +193,9 @@ class Task:
                     svcands.extend(bins[curr_bin])
                     size+=bin_min_size
 
+                    # 满足条件时,触发sv分组
                     if (not config.combine_exhaustive and len(svcands) >= bin_max_candidates) or curr_bin == last_bin:
-                        # 非详尽模式，svcands数目超过阈值
+                        # 非详尽模式且svcands数目超过阈值, 或者到达最后bin
                         if len(svcands)==0:
                             size=0
                             continue

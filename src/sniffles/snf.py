@@ -155,7 +155,7 @@ class SNFile:
             try:
                 self.handle.seek(self.header_length+block_data_start)
                 data=gzip.decompress(self.handle.read(block_data_length))
-                blocks.append(self.unserialize_block(data))
+                blocks.append(self.unserialize_block(data)) # 此对象为某个block内的所有cands，为字典{}.
             except Exception as e:
                 print(f"Error when reading block '{contig}.{block_index}' from '{self.filename}': {e}. The file may not be a valid .snf file or could have been corrupted.")
                 if self.config.combine_close_handles:

@@ -640,6 +640,8 @@ def Sniffles2_Main(config,processes):
             for block,(part_block_start,part_block_len) in part["snf_index"].items():
                 if not block in main_index[part_contig]:
                     main_index[part_contig][block]=[]
+                # 在迭代处理task的block时，其他task可能存在该block的数据
+                # 即两个task中存在共有的block index
                 main_index[part_contig][block].append((part_block_start+offset,part_block_len)) # offset表示整个文件的偏移量
             offset+=part["snf_total_length"]
 
