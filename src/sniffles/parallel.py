@@ -128,7 +128,7 @@ class Task:
         #block_groups_keep_threshold=5000
         #TODO: Parameterize
         bin_min_size=config.combine_min_size # 100.
-        bin_max_candidates=max(25,int(len(config.snf_input_info)*0.5))
+        bin_max_candidates=max(25,int(len(config.snf_input_info)*0.5)) # SNF文件数目一半，最大25
         overlap_abs=config.combine_overlap_abs # 2500.
 
         # 读取样本内部ID

@@ -134,6 +134,9 @@ class SNFile:
             self.close()
 
     def read_blocks(self,contig,block_index):
+        """
+        根据block index获取block的数据.
+        """
         if not self.is_open():
             self.open()
         block_index=str(block_index)
