@@ -186,7 +186,7 @@ class Task:
                 curr_bin=0
                 size=0
                 svcands=[]
-                keep=groups_keep[svtype]
+                keep=groups_keep[svtype] # 初始为[].
                 sorted_bins=sorted(bins)
                 last_bin=sorted_bins[-1]
                 for curr_bin in sorted_bins:
@@ -197,10 +197,11 @@ class Task:
                     if (not config.combine_exhaustive and len(svcands) >= bin_max_candidates) or curr_bin == last_bin:
                         # 非详尽模式且svcands数目超过阈值, 或者到达最后bin
                         if len(svcands)==0:
+                            # 到达最后bin但是没有svcands
                             size=0
                             continue
                         prevkept=len(keep)
-                        svgroups=cluster.resolve_block_groups(svtype,svcands,keep,config)
+                        svgroups=cluster.resolve_block_groups(svtype,svcands,keep,config) # 将svcands进行分组
                         groups_call=[]
                         keep=[]
                         for group in svgroups:

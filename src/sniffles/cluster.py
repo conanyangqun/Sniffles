@@ -340,23 +340,30 @@ def resolve(svtype,leadtab_provider,config,tr):
 
 def resolve_block_groups(svtype,svcands,groups_initial,config):
     """For clustering groups of SVs for combining .snfs (multi-call)"""
+    # 在合并多样本snf时，执行sv的分组
+    # 迭代每个svcand，寻找最佳group。不存在时，则创建一个group。返回所有的svgroups。
 
     #TODO: Remove sorting
-    groups=groups_initial
+    groups=groups_initial # [], 列表
     for svcand in sorted(svcands,key=lambda cand: cand.support,reverse=True):
         best_group=None
         best_dist=math.inf
 
         if svtype=="BND":
+            # BND类型
             mate_contig,mate_ref_start=svcand.bnd_info.mate_contig,svcand.bnd_info.mate_ref_start
+            # 判断最佳的group
             for group in groups:
                 #TODO: Favor bigger groups in placement
                 dist=abs(group.pos_mean - svcand.pos) + abs(group.bnd_mate_ref_start_mean - mate_ref_start)
                 if dist < best_dist and dist <= config.cluster_merge_bnd*2 and group.bnd_mate_contig==mate_contig:
+                    # 当前svcand与group之间距离在阈值之内
                     if not config.combine_separate_intra or not svcand.sample_internal_id in group.included_samples:
                         best_group=group
                         best_dist=dist
         else:
+            # 其他类型
+            # 判断最佳group
             for group in groups:
                 #TODO: Favor bigger groups in placement
                 dist=abs(group.pos_mean - svcand.pos) + abs(abs(group.len_mean) - abs(svcand.svlen))
@@ -367,6 +374,7 @@ def resolve_block_groups(svtype,svcands,groups_initial,config):
                         best_dist=dist
 
         if best_group==None:
+            # 未找到最佳group时以当前svcand创建group
             group=sv.SVGroup(candidates=[svcand],
                              pos_mean=float(svcand.pos),
                              len_mean=float(abs(svcand.svlen)),
@@ -377,6 +385,7 @@ def resolve_block_groups(svtype,svcands,groups_initial,config):
                 group.bnd_mate_ref_start_mean=mate_ref_start
             groups.append(group)
         else:
+            # 将svcand添加到选定的group中
             group_size=len(best_group.candidates)
             best_group.pos_mean*=group_size
             best_group.len_mean*=group_size
