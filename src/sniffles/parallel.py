@@ -149,6 +149,7 @@ class Task:
         for block_index in range(self.start,self.end+config.snf_block_size,config.snf_block_size): # 这里是因为start=0,即第一个block
             
             # 读取某个block下所有样本的数据
+            # 读取所有样本在某个block的数据
             samples_blocks={}
             for sample_internal_id,(sample_filename,sample_header,sample_snf) in samples_headers_snf.items():
                 blocks=sample_snf.read_blocks(self.contig,block_index) # 获取该block的数据
@@ -201,11 +202,13 @@ class Task:
                             size=0
                             continue
                         prevkept=len(keep)
-                        svgroups=cluster.resolve_block_groups(svtype,svcands,keep,config) # 将svcands进行分组
+                        svgroups=cluster.resolve_block_groups(svtype,svcands,keep,config) # 将svcands进行分组, 以sv.SVGroup表示
                         groups_call=[]
                         keep=[]
                         for group in svgroups:
-                            coverage_bin=int(group.pos_mean/config.coverage_binsize_combine)*config.coverage_binsize_combine
+                            # group是sv.SVGroup类型
+                            # 记录不在group内的样本的覆盖度信息
+                            coverage_bin=int(group.pos_mean/config.coverage_binsize_combine)*config.coverage_binsize_combine # 覆盖度bin
                             for non_included_sample in sample_internal_ids-group.included_samples:
                                 if samples_blocks[non_included_sample]!=None and coverage_bin in samples_blocks[non_included_sample][0]["_COVERAGE"]:
                                     coverage=samples_blocks[non_included_sample][0]["_COVERAGE"][coverage_bin]
