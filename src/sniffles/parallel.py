@@ -220,6 +220,7 @@ class Task:
                                     group.coverages_nonincluded[non_included_sample]=coverage
 
                             if abs(group.pos_mean - curr_bin) < max(size*0.5,overlap_abs):
+                                # 当前group与当前bin距离很近
                                 keep.append(group)
                             else:
                                 groups_call.append(group)

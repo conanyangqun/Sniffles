@@ -248,6 +248,7 @@ def resolve_bnd(svcall,cluster,config):
     svcall.set_info("CHR2",mate_contig)
 
 def call_groups(svgroups,config,task):
+    # 从每个SVGroup中检出svcall
     for group in svgroups:
         svcall=call_group(group,config,task)
         if svcall!=None:
@@ -255,6 +256,7 @@ def call_groups(svgroups,config,task):
 
 def call_group(svgroup,config,task):
     """For combining grouped SV calls from multiple .snf samples into one SV call"""
+    # 从svgroup中检出svcall
     first_cand=svgroup.candidates[0]
 
     #Filtering
@@ -262,12 +264,14 @@ def call_group(svgroup,config,task):
     sample_internal_ids=set(sample["internal_id"] for sample in config.snf_input_info)
     total_count=len(svgroup.included_samples)
     pass_count=sum(cand.qc==True for cand in svgroup.candidates)
+    # sv_pass的样本至少1个, 或者具有sv的样本占比在20%以上且至少2个样本
     qc=(pass_count > 0 and pass_count/samples_count >= config.combine_high_confidence) or (total_count/samples_count >= config.combine_low_confidence and total_count >= config.combine_low_confidence_abs)
 
     if not qc:
         return None
 
     if (not config.combine_output_filtered) and not any(cand.qc and cand.filter=="PASS" for cand in svgroup.candidates):
+        # 如果存在sv_cand未通过过滤，默认不输出
         return None
 
     if config.output_rnames:
@@ -275,6 +279,8 @@ def call_group(svgroup,config,task):
     else:
         rnames=None
 
+    # 获取所有样本的基因型
+    # svcand并没有设置基因型，因此为./.
     genotypes={}
     genotyped_count=0
     for cand in svgroup.candidates:
@@ -284,6 +290,7 @@ def call_group(svgroup,config,task):
             cand.genotypes[0]=(".",".",0,0,cand.support,None)
         if cand.sample_internal_id in genotypes:
             #Intra-sample merging
+            # 处理同一个样本的多个svcand
             a,b,gt_qual,dr,dv,ps=cand.genotypes[0]
             curr_a,curr_b,curr_gt_qual,curr_dr,curr_dv,curr_ps,curr_id=genotypes[cand.sample_internal_id]
             new_id=curr_id+","+config.id_prefix+cand.id
@@ -296,15 +303,21 @@ def call_group(svgroup,config,task):
             genotypes[cand.sample_internal_id]=(a,b,gt_qual,dr,dv,ps,config.id_prefix+cand.id)
         genotyped_count+=1
 
+    # 设置没有svcand的样本的基因型
     for sample_internal_id in sample_internal_ids:
         if sample_internal_id in genotypes:
+            # 不处理具有svcand的样本
             continue
         coverage=svgroup.coverages_nonincluded[sample_internal_id]
         if coverage >= config.combine_null_min_coverage:
+            # 覆盖度超过阈值5, 设置基因型为0/0.
             genotypes[sample_internal_id]=(0,0,0,coverage,0,None,"NULL")
         else:
+            # 覆盖度未超过阈值, 基因型设置为./.
             genotypes[sample_internal_id]=(".",".",0,coverage,0,None,"NULL")
 
+    # 输出一致性基因型
+    # 待验证: 开启输出一致性基因型时, 由于svcands并未设置基因型, 会导致结果始终为空
     if config.combine_consensus:
         genotypes_consensus={}
         for a,b,gt_qual,dr,dv in genotypes.values():
@@ -315,20 +328,26 @@ def call_group(svgroup,config,task):
             genotypes_consensus[(a,b)]["dr"].append(dr)
             genotypes_consensus[(a,b)]["dv"].append(dv)
         most_common_count=genotypes_consensus[sorted(genotypes_consensus,key=lambda k: genotypes_consensus[k]["count"],reverse=True)[0]]["count"]
-        most_common_gt=[gt for gt in genotypes_consensus if genotypes_consensus[gt]["count"]==most_common_count]
+        most_common_gt=[gt for gt in genotypes_consensus if genotypes_consensus[gt]["count"]==most_common_count] # 可能存在多个gt
         cons_a,cons_b=max(most_common_gt)
         consensus_info=genotypes_consensus[(cons_a,cons_b)]
         genotypes={0:(cons_a,cons_b,int(sum(consensus_info["qual"])/consensus_info["count"]),sum(consensus_info["dr"]),sum(consensus_info["dv"]))}
         if cons_a!=1 and cons_b!=1:
+            # 一致性基因型为0/0或./.
             return None
-
+    
+    # 合并两个样本时,覆盖低质量的基因型
+    # 用于tumor-normal场景
     if config.combine_pair_relabel:
+        # 寻找QUAL超过阈值的"最大"基因型
         max_gt=(0,0)
         for sample_id in genotypes:
             a,b,qual,dr,dv,ps,new_id=genotypes[sample_id]
             if qual > config.combine_pair_relabel_threshold and a!=".":
+                # Q20阈值以上
                 max_gt=max(max_gt,(a,b))
 
+        # 用max_gt更新QUAL低于阈值的样本的基因型
         if max_gt!=(0,0):
             for sample_id in genotypes:
                 a,b,qual,dr,dv,ps,new_id=genotypes[sample_id]
@@ -336,6 +355,7 @@ def call_group(svgroup,config,task):
                     max_a,max_b=max_gt
                     genotypes[sample_id]=(max_a,max_b,qual,dr,dv,ps,new_id)
 
+    # 从svgroup中检出svcall
     svcall_pos=int(util.median(cand.pos for cand in svgroup.candidates))
     svcall_svlen=int(util.median(cand.svlen for cand in svgroup.candidates))
     svcall_alt=first_cand.alt
