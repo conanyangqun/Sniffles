@@ -278,7 +278,7 @@ def Main_Internal(proc_id,config,pipe):
 
             _,read_count=task.build_leadtab(config)
             svcandidates=task.call_candidates(qc,config)
-            svcalls=task.finalize_candidates(svcandidates,not qc,config)
+            svcalls=task.finalize_candidates(svcandidates,not qc,config) # 这一步骤内赋值基因型的操作也会影响到svcandidates中的元素
 
             # 是否输出所有的svcalls
             if config.no_qc:

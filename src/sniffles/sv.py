@@ -280,7 +280,7 @@ def call_group(svgroup,config,task):
         rnames=None
 
     # 获取所有样本的基因型
-    # svcand并没有设置基因型，因此为./.
+    # svcand的基因型在call_sample时已经设置
     genotypes={}
     genotyped_count=0
     for cand in svgroup.candidates:
@@ -317,7 +317,6 @@ def call_group(svgroup,config,task):
             genotypes[sample_internal_id]=(".",".",0,coverage,0,None,"NULL")
 
     # 输出一致性基因型
-    # 待验证: 开启输出一致性基因型时, 由于svcands并未设置基因型, 会导致结果始终为空
     if config.combine_consensus:
         genotypes_consensus={}
         for a,b,gt_qual,dr,dv in genotypes.values():
