@@ -361,6 +361,7 @@ def call_group(svgroup,config,task):
     svcall_alt=first_cand.alt
     svcall_alt_mindist=abs(len(svcall_alt)-svcall_svlen)
     if first_cand.svtype=="INS":
+        # 寻找最佳的最佳的svcand
         svcall_end=svcall_pos
         for cand in svgroup.candidates:
             dist=abs(len(cand.alt)-svcall_svlen)
@@ -394,11 +395,13 @@ def call_group(svgroup,config,task):
                   coverage_start=util.mean_or_none_round(cand.coverage_start for cand in svgroup.candidates if cand.coverage_start!=None),
                   coverage_center=util.mean_or_none_round(cand.coverage_center for cand in svgroup.candidates if cand.coverage_center!=None),
                   coverage_end=util.mean_or_none_round(cand.coverage_end for cand in svgroup.candidates if cand.coverage_end!=None),
-                  coverage_downstream=util.mean_or_none_round(cand.coverage_downstream for cand in svgroup.candidates if cand.coverage_downstream!=None) )
+                  coverage_downstream=util.mean_or_none_round(cand.coverage_downstream for cand in svgroup.candidates if cand.coverage_downstream!=None)
+                )
 
     svcall.set_info("STDEV_POS",util.stdev(cand.pos for cand in svgroup.candidates))
     svcall.set_info("STDEV_LEN",util.stdev(cand.svlen for cand in svgroup.candidates))
 
+    # svcall长度低于阈值
     if abs(svcall.svlen) < config.minsvlen_screen:
         return None
 

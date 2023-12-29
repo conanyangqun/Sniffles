@@ -224,12 +224,13 @@ class Task:
                                 keep.append(group)
                             else:
                                 groups_call.append(group)
-                        svcalls.extend(sv.call_groups(groups_call,config,self))
+                        svcalls.extend(sv.call_groups(groups_call,config,self)) # 从svgroup检出svcall, 只返回通过QC的svcall.
                         size=0
                         svcands=[]
 
                 groups_keep[svtype]=keep
 
+        # 处理残留的一些svcands
         for svtype in groups_keep:
             svcalls.extend(sv.call_groups(groups_keep[svtype],config,self))
 

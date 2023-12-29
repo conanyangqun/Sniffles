@@ -72,6 +72,9 @@ def mean_or_none(nums):
         return sum(nums)/len(nums)
 
 def mean_or_none_round(nums):
+    """
+    返回一组数的均值或者None
+    """
     r=mean_or_none(nums)
     if r==None:
         return r
