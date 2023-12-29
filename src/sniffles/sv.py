@@ -363,6 +363,7 @@ def call_group(svgroup,config,task):
     if first_cand.svtype=="INS":
         # 寻找最佳的最佳的svcand
         svcall_end=svcall_pos
+        # 寻找与svlen最接近的svcall, 获取其ALT序列
         for cand in svgroup.candidates:
             dist=abs(len(cand.alt)-svcall_svlen)
             if dist < svcall_alt_mindist:
